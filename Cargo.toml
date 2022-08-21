@@ -2,6 +2,9 @@
 name = "els"
 version = "0.0.1"
 edition = "2021"
+description = "An Erg compiler frontend for IDEs, implements LSP."
+authors = ["Shunsuke Shibayama <sbym1346@gmail.com>"]
+license = "MIT OR Apache-2.0"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
