@@ -23,38 +23,49 @@ checksum = "bef38d45163c2f1dde094a7dfd33ccf595c92905c8f8f4fdc18d06fb1037718a"
 name = "els"
 version = "0.0.1"
 dependencies = [
+ "erg_common",
  "erg_compiler",
+ "erg_type",
  "lsp-types",
  "serde",
  "serde_json",
+ "url",
+ "urlencoding",
 ]
 
 [[package]]
 name = "erg_common"
-version = "0.2.6"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fd5ed162ce807ae3bbd7f34462d24b505ea0d227e78dc54aac6684630ae35eb9"
+version = "0.5.1"
+source = "git+http://github.com/erg-lang/erg?branch=main#438ae9c2d688b82c544d9ac1cc40bd52a7c513e9"
 dependencies = [
  "atty",
 ]
 
 [[package]]
 name = "erg_compiler"
-version = "0.2.6"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "66f5eadf5a0b91f640c6292b6fd4b04a10c78a3cb50df71479586b812802154f"
+version = "0.5.1"
+source = "git+http://github.com/erg-lang/erg?branch=main#438ae9c2d688b82c544d9ac1cc40bd52a7c513e9"
 dependencies = [
  "erg_common",
  "erg_parser",
+ "erg_type",
 ]
 
 [[package]]
 name = "erg_parser"
-version = "0.2.6"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f030692a749cc8f59526c06425070ebb1d67e7abba99df2363fa22d8c85e3372"
+version = "0.5.1"
+source = "git+http://github.com/erg-lang/erg?branch=main#438ae9c2d688b82c544d9ac1cc40bd52a7c513e9"
 dependencies = [
  "erg_common",
+]
+
+[[package]]
+name = "erg_type"
+version = "0.5.1"
+source = "git+http://github.com/erg-lang/erg?branch=main#438ae9c2d688b82c544d9ac1cc40bd52a7c513e9"
+dependencies = [
+ "erg_common",
+ "erg_parser",
 ]
 
 [[package]]
@@ -240,6 +251,12 @@ dependencies = [
  "percent-encoding",
  "serde",
 ]
+
+[[package]]
+name = "urlencoding"
+version = "2.1.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e8db7427f936968176eaa7cdf81b7f98b980b18495ec28f1b5791ac3bfe3eea9"
 
 [[package]]
 name = "winapi"
