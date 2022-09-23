@@ -1,3 +1,5 @@
+mod client;
+
 fn main() {
-    println!("Coming soon ...");
+    client::run().unwrap();
 }

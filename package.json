@@ -1,0 +1,28 @@
+{
+  "name": "erg-language-server",
+  "version": "0.1.0",
+  "author": "erg-lang team <moderation.erglang@gmail.com>",
+  "license": "MIT OR Apache-2.0",
+  "description": "An Erg compiler frontend for IDEs, implements LSP.",
+  "engines": {
+    "vscode": "^1.52.1"
+  },
+  "main": "./extension.js",
+  "activationEvents": [
+    "onLanguage:erg"
+  ],
+  "contributes": {
+    "languages": [
+      {
+        "id": "erg",
+        "extensions": [
+          ".er"
+        ]
+      }
+    ]
+  },
+  "dependencies": {
+    "vscode-languageclient": "^7.0.0"
+  },
+  "private": true
+}
