@@ -5,16 +5,16 @@ use serde_json::json;
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ErrorMessage {
     jsonrpc: String,
-    id: Number,
+    id: Option<Number>,
     error: Value,
 }
 
 impl ErrorMessage {
     #[allow(dead_code)]
-    pub fn new<N: Into<Number>, S: Into<String>>(id: N, error: Value) -> Self {
+    pub fn new<N: Into<Number>>(id: Option<N>, error: Value) -> Self {
         Self {
             jsonrpc: "2.0".into(),
-            id: id.into(),
+            id: id.map(|i| i.into()),
             error,
         }
     }

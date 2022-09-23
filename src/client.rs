@@ -6,23 +6,35 @@ use std::io::{stdin, stdout, Write, /*BufRead as _*/};
 use std::str::FromStr;
 
 use serde::{Serialize};
-use serde_json::Value;
+use serde_json::{Value};
+use serde_json::json;
 
-use crate::message::{LogMessage};
+use crate::message::{LogMessage, ErrorMessage};
 
-fn send<T: ?Sized + Serialize>(output: &mut StdoutLock, message: &T) -> Result<(), Box<dyn std::error::Error>> {
+type ELSResult<T> = Result<T, Box<dyn std::error::Error>>;
+
+fn send<T: ?Sized + Serialize>(output: &mut StdoutLock, message: &T) -> ELSResult<()> {
     let msg = serde_json::to_string(message)?;
     write!(output, "Content-Length: {}\r\n\r\n{}", msg.len(), msg)?;
     output.flush()?;
     Ok(())
 }
 
-fn log<S: Into<String>>(output: &mut StdoutLock, msg: S) -> Result<(), Box<dyn std::error::Error>> {
+fn send_log<S: Into<String>>(output: &mut StdoutLock, msg: S) -> ELSResult<()> {
     send(output, &LogMessage::new(msg))
 }
 
-fn init(output: &mut StdoutLock) -> Result<(), Box<dyn std::error::Error>> {
-    log(output, "initialized")
+fn send_error<S: Into<String>>(output: &mut StdoutLock, id: Option<i64>, code: i64, msg: S) -> ELSResult<()> {
+    send(output, &ErrorMessage::new(id, json!({ "code": code, "message": msg.into() })))
+}
+
+fn send_invalid_req_error(output: &mut StdoutLock) -> ELSResult<()> {
+    send_error(output, None, -32601, "received an invalid request")
+}
+
+/// initialize ELS
+fn init(output: &mut StdoutLock) -> ELSResult<()> {
+    send_log(output, "initializing ELS")
 }
 
 fn read_message(input: &mut StdinLock) -> Result<String, io::Error> {
@@ -91,13 +103,48 @@ fn read_message(input: &mut StdinLock) -> Result<String, io::Error> {
     String::from_utf8(content).map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))
 }
 
+fn dispatch(output: &mut StdoutLock, msg: Value) -> ELSResult<()> {
+    match (msg.get("id").and_then(|i| i.as_i64()), msg.get("method").and_then(|m| m.as_str())) {
+        (Some(id), Some(method)) => handle_method(output, id, method),
+        (Some(_id), None) => {
+            // ignore at this time
+            Ok(())
+        }
+        (None, Some(notification)) => handle_notification(output, notification),
+        _ => send_invalid_req_error(output),
+    }
+}
+
+fn handle_method(output: &mut StdoutLock, id: i64, method: &str) -> ELSResult<()> {
+    match method {
+        "initialize" => {
+            send_log(output, "initialize")?;
+            send(output, &json!({
+                "jsonrpc": "2.0",
+                "id": id,
+                "result": { "capabilities": { "textDocumentSync": 1 } }
+            }))
+        },
+        other => {
+            send_error(output, Some(id), -32600, format!("{other} is not supported"))
+        }
+    }
+}
+
+fn handle_notification(output: &mut StdoutLock, notification: &str) -> ELSResult<()> {
+    match notification {
+        "initialized" => send_log(output, "successfully bound"),
+        _ => send_log(output, format!("received notification: {}", notification)),
+    }
+}
+
 pub fn run() -> Result<(), Box<dyn std::error::Error>> {
     let mut input = stdin().lock();
     let mut output = stdout().lock();
     init(&mut output)?;
     loop {
         let msg = Value::from_str(&read_message(&mut input)?)?;
-        log(&mut output, &format!("id: {}", msg.get("id").unwrap()))?;
+        dispatch(&mut output, msg)?;
     }
     // Ok(())
 }
