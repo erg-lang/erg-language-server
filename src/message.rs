@@ -1,0 +1,43 @@
+use serde::{Serialize, Deserialize};
+use serde_json::{Number,Value};
+use serde_json::json;
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct ErrorMessage {
+    jsonrpc: String,
+    id: Number,
+    error: Value,
+}
+
+impl ErrorMessage {
+    #[allow(dead_code)]
+    pub fn new<N: Into<Number>, S: Into<String>>(id: N, error: Value) -> Self {
+        Self {
+            jsonrpc: "2.0".into(),
+            id: id.into(),
+            error,
+        }
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct LogMessage {
+    jsonrpc: String,
+    method: String,
+    params: Value,
+}
+
+impl LogMessage {
+    pub fn new<S: Into<String>>(message: S) -> Self {
+        Self {
+            jsonrpc: "2.0".into(),
+            method: "window/logMessage".into(),
+            params: json! {
+                {
+                    "type": 3,
+                    "message": message.into(),
+                }
+            },
+        }
+    }
+}
