@@ -1,6 +1,7 @@
-mod client;
+mod server;
 mod message;
 
 fn main() {
-    client::run().unwrap();
+    let mut server = server::Server::new();
+    server.run().unwrap();
 }
