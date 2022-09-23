@@ -1,3 +1,15 @@
 # els (erg-language-server)
 
-> This project is very experimental.
+ELS is a language server for the [Erg](https://github.com/erg-lang/erg) programing language.
+
+## Features currently implemented
+
+- Basic code completion
+- Diagnostics
+- Syntax highlighting (by [vscode-erg](https://github.com/erg-lang/vscode-erg))
+
+## Installation
+
+```console
+cargo install els
+```
