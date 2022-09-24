@@ -33,16 +33,18 @@ dependencies = [
 
 [[package]]
 name = "erg_common"
-version = "0.5.2"
-source = "git+https://github.com/erg-lang/erg?branch=main#62760d1d5e442e6090720805d964ec3e43b7839b"
+version = "0.5.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "543fdc20bba4d703fd4054ceffd5a04643032a49992e47407a79c580c61eefb0"
 dependencies = [
  "atty",
 ]
 
 [[package]]
 name = "erg_compiler"
-version = "0.5.2"
-source = "git+https://github.com/erg-lang/erg?branch=main#62760d1d5e442e6090720805d964ec3e43b7839b"
+version = "0.5.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b66ec684abb14db5c035989bb04ee0b4f63815a5b808653e46191ea1f87dcd4f"
 dependencies = [
  "erg_common",
  "erg_parser",
@@ -51,16 +53,18 @@ dependencies = [
 
 [[package]]
 name = "erg_parser"
-version = "0.5.2"
-source = "git+https://github.com/erg-lang/erg?branch=main#62760d1d5e442e6090720805d964ec3e43b7839b"
+version = "0.5.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5553ca0cc8d59e7a8f1045e0081508b88101277e55998d16adb07fc50b90d631"
 dependencies = [
  "erg_common",
 ]
 
 [[package]]
 name = "erg_type"
-version = "0.5.2"
-source = "git+https://github.com/erg-lang/erg?branch=main#62760d1d5e442e6090720805d964ec3e43b7839b"
+version = "0.5.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2dba6694e054ee3ff072017e5d633724d98943f5edbe6cbe3ef3d4c8ca0470c2"
 dependencies = [
  "erg_common",
  "erg_parser",
