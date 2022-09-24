@@ -5,6 +5,7 @@ use std::fs::File;
 
 use erg_compiler::erg_parser::lex::Lexer;
 use erg_compiler::erg_parser::token::Token;
+use lsp_types::notification::Notification;
 use serde::{Serialize, Deserialize};
 use serde_json::{Value};
 use serde_json::json;
@@ -293,7 +294,7 @@ impl Server {
     }
 
     fn show_completion(&mut self, msg: &Value) -> ELSResult<()> {
-        self.send_log(format!("requested completion: {msg}"))?;
+        self.send_log(format!("completion requested: {msg}"))?;
         let trigger = msg["params"]["context"]["triggerCharacter"].as_str();
         let acc = match trigger {
             Some(".")| Some("::") => AccessKind::Attr,
@@ -322,7 +323,7 @@ impl Server {
     }
 
     fn show_definition(&mut self, msg: &Value) -> ELSResult<()> {
-        self.send_log(format!("requested definition: {msg}"))?;
+        self.send_log(format!("definition requested : {msg}"))?;
         let params = GotoDefinitionParams::deserialize(&msg["params"])?;
         let uri = params.text_document_position_params.text_document.uri;
         let pos = params.text_document_position_params.position;
@@ -367,7 +368,7 @@ impl Server {
     }
 
     fn show_hover(&mut self, msg: &Value) -> ELSResult<()> {
-        self.send_log(format!("requested hover: {msg}"))?;
+        self.send_log(format!("hover requested : {msg}"))?;
         let params = HoverParams::deserialize(&msg["params"])?;
         let uri = params.text_document_position_params.text_document.uri;
         let pos = params.text_document_position_params.position;
