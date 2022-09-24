@@ -5,7 +5,6 @@ use std::fs::File;
 
 use erg_compiler::erg_parser::lex::Lexer;
 use erg_compiler::erg_parser::token::Token;
-use lsp_types::notification::Notification;
 use serde::{Serialize, Deserialize};
 use serde_json::{Value};
 use serde_json::json;
