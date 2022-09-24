@@ -1,4 +1,4 @@
-use std::io;
+use std::io::{self, BufReader};
 use std::io::{stdin, stdout, Write, StdoutLock, StdinLock, BufRead, Read};
 use std::str::FromStr;
 use std::fs::File;
@@ -15,24 +15,22 @@ use erg_common::traits::{Runnable, Stream, Locational};
 
 use erg_type::Type;
 
+use erg_compiler::erg_parser::ast::VarName;
 use erg_compiler::erg_parser::token::{TokenKind, TokenCategory};
 use erg_compiler::AccessKind;
+use erg_compiler::varinfo::VarInfo;
 use erg_compiler::context::Context;
 use erg_compiler::build_hir::HIRBuilder;
 
 use lsp_types::{
     Diagnostic, DiagnosticSeverity, Position, Range, CompletionItem, CompletionItemKind, InitializeResult, ServerCapabilities,
-    TextDocumentSyncCapability, TextDocumentSyncKind, CompletionOptions, PublishDiagnosticsParams, Url, OneOf, GotoDefinitionParams, GotoDefinitionResponse
+    TextDocumentSyncCapability, TextDocumentSyncKind, CompletionOptions, PublishDiagnosticsParams, Url, OneOf, GotoDefinitionParams, GotoDefinitionResponse,
+    HoverProviderCapability, HoverParams, HoverContents, MarkedString, ClientCapabilities,
 };
 
 use crate::message::{LogMessage, ErrorMessage};
 
 type ELSResult<T> = Result<T, Box<dyn std::error::Error>>;
-
-#[derive(Debug, Default, Serialize, Deserialize)]
-pub struct ClientCapabilities {
-    pub publish_diagnostics: bool,
-}
 
 pub struct Server {
     client_capas: ClientCapabilities,
@@ -82,14 +80,17 @@ impl Server {
 
     fn send_diagnostics(&mut self, uri: Url, diagnostics: Vec<Diagnostic>) -> ELSResult<()> {
         let params = PublishDiagnosticsParams::new(uri, diagnostics, None);
-        if self.client_capas.publish_diagnostics {
+        if self.client_capas.text_document.as_ref()
+            .map(|doc| doc.publish_diagnostics.is_some())
+            .unwrap_or(false)
+        {
             self.send(&json!({
                 "jsonrpc": "2.0",
                 "method": "textDocument/publishDiagnostics",
                 "params": params,
             }))?;
         } else {
-            self.send_log("client does not support diagnostics")?;
+            self.send_log("the client does not support diagnostics")?;
         }
         Ok(())
     }
@@ -99,11 +100,7 @@ impl Server {
         self.send_log("initializing ELS")?;
         #[allow(clippy::collapsible_if)]
         if msg.get("params").is_some() && msg["params"].get("capabilities").is_some() {
-            if msg["params"]["capabilities"].get("textDocument").is_some() && msg["params"]["capabilities"]["textDocument"].get("publishDiagnostics").is_some() {
-                // TODO: more detailed configuration
-                self.client_capas.publish_diagnostics = true;
-            }
-            // and other capabilities
+            self.client_capas = ClientCapabilities::deserialize(&msg["params"]["capabilities"])?;
         }
         // self.send_log(format!("set client capabilities: {:?}", self.client_capas))?;
         let mut result = InitializeResult::default();
@@ -113,10 +110,25 @@ impl Server {
         comp_options.trigger_characters = Some(vec![".".to_string(), "::".to_string()]);
         result.capabilities.completion_provider = Some(comp_options);
         result.capabilities.definition_provider = Some(OneOf::Left(true));
+        result.capabilities.hover_provider = Some(HoverProviderCapability::Simple(true));
         self.send(&json!({
             "jsonrpc": "2.0",
             "id": id,
             "result": result,
+        }))
+    }
+
+    fn exit(&mut self) -> ELSResult<()> {
+        self.send_log("exiting ELS")?;
+        std::process::exit(0);
+    }
+
+    fn shutdown(&mut self, id: i64) -> ELSResult<()> {
+        self.send_log("shutting down ELS")?;
+        self.send(&json!({
+            "jsonrpc": "2.0",
+            "id": id,
+            "result": json!(null),
         }))
     }
 
@@ -189,7 +201,7 @@ impl Server {
 
     fn dispatch(&mut self, msg: Value) -> ELSResult<()> {
         match (msg.get("id").and_then(|i| i.as_i64()), msg.get("method").and_then(|m| m.as_str())) {
-            (Some(id), Some(method)) => self.handle_method(&msg, id, method),
+            (Some(id), Some(method)) => self.handle_request(&msg, id, method),
             (Some(_id), None) => {
                 // ignore at this time
                 Ok(())
@@ -199,23 +211,26 @@ impl Server {
         }
     }
 
-    fn handle_method(&mut self, msg: &Value, id: i64, method: &str) -> ELSResult<()> {
+    fn handle_request(&mut self, msg: &Value, id: i64, method: &str) -> ELSResult<()> {
         match method {
             "initialize" => self.init(msg, id),
+            "shutdown" => self.shutdown(id),
             "textDocument/completion" => self.show_completion(msg),
             "textDocument/definition" => self.show_definition(msg),
+            "textDocument/hover" => self.show_hover(msg),
             other => {
                 self.send_error(Some(id), -32600, format!("{other} is not supported"))
             }
         }
     }
 
-    fn handle_notification(&mut self, msg: &Value, notification: &str) -> ELSResult<()> {
-        match notification {
+    fn handle_notification(&mut self, msg: &Value, method: &str) -> ELSResult<()> {
+        match method {
             "initialized" => self.send_log("successfully bound"),
+            "exit" => self.exit(),
             "textDocument/didOpen" => {
                 let uri = Url::parse(msg["params"]["textDocument"]["uri"].as_str().unwrap())?;
-                self.send_log(format!("{notification}: {uri}"))?;
+                self.send_log(format!("{method}: {uri}"))?;
                 self.check_file(
                     uri,
                     msg["params"]["textDocument"]["text"].as_str().unwrap(),
@@ -223,14 +238,14 @@ impl Server {
             },
             "textDocument/didSave" => {
                 let uri = Url::parse(msg["params"]["textDocument"]["uri"].as_str().unwrap())?;
-                self.send_log(format!("{notification}: {uri}"))?;
+                self.send_log(format!("{method}: {uri}"))?;
                 let path = uri.to_file_path().unwrap();
                 let mut code = String::new();
                 File::open(&path)?.read_to_string(&mut code)?;
                 self.check_file(uri, &code)
             },
             // "textDocument/didChange"
-            _ => self.send_log(format!("received notification: {}", notification)),
+            _ => self.send_log(format!("received notification: {}", method)),
         }
     }
 
@@ -278,7 +293,7 @@ impl Server {
     }
 
     fn show_completion(&mut self, msg: &Value) -> ELSResult<()> {
-        self.send_log(format!("showing completion: {msg}"))?;
+        self.send_log(format!("requested completion: {msg}"))?;
         let trigger = msg["params"]["context"]["triggerCharacter"].as_str();
         let acc = match trigger {
             Some(".")| Some("::") => AccessKind::Attr,
@@ -307,7 +322,7 @@ impl Server {
     }
 
     fn show_definition(&mut self, msg: &Value) -> ELSResult<()> {
-        self.send_log(format!("showing definition: {msg}"))?;
+        self.send_log(format!("requested definition: {msg}"))?;
         let params = GotoDefinitionParams::deserialize(&msg["params"])?;
         let uri = params.text_document_position_params.text_document.uri;
         let pos = params.text_document_position_params.position;
@@ -318,10 +333,7 @@ impl Server {
             {
                 self.send_log("attribute")?;
                 GotoDefinitionResponse::Array(vec![])
-            } else if !token.category_is(TokenCategory::Symbol) {
-                self.send_log("not symbol")?;
-                GotoDefinitionResponse::Array(vec![])
-            } else if let Ok((name, _)) = self.context.as_ref().unwrap().get_var_info(token.inspect()) {
+            } else if let Some((name, _vi)) = self.get_definition(&token)? {
                 match Self::loc_to_range(name.loc()) {
                     Some(range) => {
                         self.send_log("found")?;
@@ -333,13 +345,52 @@ impl Server {
                     }
                 }
             } else {
-                self.send_log("not found")?;
                 GotoDefinitionResponse::Array(vec![])
             }
         } else {
             self.send_log("lex error occurred")?;
             GotoDefinitionResponse::Array(vec![])
         };
+        self.send(&json!({ "jsonrpc": "2.0", "id": msg["id"].as_i64().unwrap(), "result": result }))
+    }
+
+    fn get_definition(&mut self, token: &Token) -> ELSResult<Option<(VarName, VarInfo)>> {
+        if !token.category_is(TokenCategory::Symbol) {
+            self.send_log("not symbol")?;
+            Ok(None)
+        } else if let Ok((name, vi)) = self.context.as_ref().unwrap().get_var_info(token.inspect()) {
+            Ok(Some((name.clone(), vi.clone())))
+        } else {
+            self.send_log("not found")?;
+            Ok(None)
+        }
+    }
+
+    fn show_hover(&mut self, msg: &Value) -> ELSResult<()> {
+        self.send_log(format!("requested hover: {msg}"))?;
+        let params = HoverParams::deserialize(&msg["params"])?;
+        let uri = params.text_document_position_params.text_document.uri;
+        let pos = params.text_document_position_params.position;
+        let mut contents = vec![];
+        match Self::get_token(uri.clone(), pos)?.map(|tok| self.get_definition(&tok)).transpose()? {
+            Some(Some((name, vi))) => {
+                if let Some(line) = name.ln_begin() {
+                    let path = uri.to_file_path().unwrap();
+                    let code_block = BufReader::new(File::open(&path)?).lines().nth(line - 1).unwrap()?;
+                    let definition = MarkedString::from_language_code("erg".into(), code_block);
+                    contents.push(definition);
+                }
+                let typ = MarkedString::from_language_code("erg".into(), format!("{name}: {}", vi.t));
+                contents.push(typ);
+            }
+            // not found or not symbol, etc.
+            Some(None) => {}
+            // lex error, etc.
+            None => {
+                self.send_log("lex error")?;
+            }
+        }
+        let result = json!({ "contents": HoverContents::Array(contents) });
         self.send(&json!({ "jsonrpc": "2.0", "id": msg["id"].as_i64().unwrap(), "result": result }))
     }
 
