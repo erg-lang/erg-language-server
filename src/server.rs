@@ -1,39 +1,33 @@
 use std::io;
 use std::io::{stdin, stdout, Write, StdoutLock, StdinLock, BufRead, Read};
-use std::path::PathBuf;
 use std::str::FromStr;
 use std::fs::File;
 
+use erg_compiler::erg_parser::lex::Lexer;
+use erg_compiler::erg_parser::token::Token;
 use serde::{Serialize, Deserialize};
 use serde_json::{Value};
 use serde_json::json;
 
-use erg_common::color::{RED, YELLOW, RESET};
+use erg_common::color::{RED, YELLOW, RESET, GREEN};
 use erg_common::config::{ErgConfig, Input};
-use erg_common::traits::{Runnable, Stream};
+use erg_common::traits::{Runnable, Stream, Locational};
 
 use erg_type::Type;
 
+use erg_compiler::erg_parser::token::{TokenKind, TokenCategory};
 use erg_compiler::AccessKind;
 use erg_compiler::context::Context;
 use erg_compiler::build_hir::HIRBuilder;
 
 use lsp_types::{
     Diagnostic, DiagnosticSeverity, Position, Range, CompletionItem, CompletionItemKind, InitializeResult, ServerCapabilities,
-    TextDocumentSyncCapability, TextDocumentSyncKind, CompletionOptions,
+    TextDocumentSyncCapability, TextDocumentSyncKind, CompletionOptions, PublishDiagnosticsParams, Url, OneOf, GotoDefinitionParams, GotoDefinitionResponse
 };
-
-use url::Url;
 
 use crate::message::{LogMessage, ErrorMessage};
 
 type ELSResult<T> = Result<T, Box<dyn std::error::Error>>;
-
-fn get_path_from_uri(uri: &str) -> ELSResult<String> {
-    let url = Url::parse(uri)?;
-    let path = urlencoding::decode(url.path())?.to_string();
-    Ok(path[1..].to_string())
-}
 
 #[derive(Debug, Default, Serialize, Deserialize)]
 pub struct ClientCapabilities {
@@ -86,15 +80,13 @@ impl Server {
         self.send_error(None, -32601, "received an invalid request")
     }
 
-    fn send_diagnostics(&mut self, uri: &str, diagnostics: Vec<Diagnostic>) -> ELSResult<()> {
+    fn send_diagnostics(&mut self, uri: Url, diagnostics: Vec<Diagnostic>) -> ELSResult<()> {
+        let params = PublishDiagnosticsParams::new(uri, diagnostics, None);
         if self.client_capas.publish_diagnostics {
             self.send(&json!({
                 "jsonrpc": "2.0",
                 "method": "textDocument/publishDiagnostics",
-                "params": {
-                    "uri": uri,
-                    "diagnostics": diagnostics,
-                }
+                "params": params,
             }))?;
         } else {
             self.send_log("client does not support diagnostics")?;
@@ -120,6 +112,7 @@ impl Server {
         let mut comp_options = CompletionOptions::default();
         comp_options.trigger_characters = Some(vec![".".to_string(), "::".to_string()]);
         result.capabilities.completion_provider = Some(comp_options);
+        result.capabilities.definition_provider = Some(OneOf::Left(true));
         self.send(&json!({
             "jsonrpc": "2.0",
             "id": id,
@@ -210,6 +203,7 @@ impl Server {
         match method {
             "initialize" => self.init(msg, id),
             "textDocument/completion" => self.show_completion(msg),
+            "textDocument/definition" => self.show_definition(msg),
             other => {
                 self.send_error(Some(id), -32600, format!("{other} is not supported"))
             }
@@ -220,32 +214,30 @@ impl Server {
         match notification {
             "initialized" => self.send_log("successfully bound"),
             "textDocument/didOpen" => {
-                let uri = msg["params"]["textDocument"]["uri"].as_str().unwrap();
-                let path = get_path_from_uri(uri)?;
+                let uri = Url::parse(msg["params"]["textDocument"]["uri"].as_str().unwrap())?;
                 self.send_log(format!("{notification}: {uri}"))?;
                 self.check_file(
                     uri,
-                    &path,
                     msg["params"]["textDocument"]["text"].as_str().unwrap(),
                 )
             },
             "textDocument/didSave" => {
-                let uri = msg["params"]["textDocument"]["uri"].as_str().unwrap();
-                let path = get_path_from_uri(uri)?;
+                let uri = Url::parse(msg["params"]["textDocument"]["uri"].as_str().unwrap())?;
+                self.send_log(format!("{notification}: {uri}"))?;
+                let path = uri.to_file_path().unwrap();
                 let mut code = String::new();
-                self.send_log(format!("{notification}: {path}"))?;
                 File::open(&path)?.read_to_string(&mut code)?;
-                self.check_file(uri, &path, &code)
+                self.check_file(uri, &code)
             },
             // "textDocument/didChange"
             _ => self.send_log(format!("received notification: {}", notification)),
         }
     }
 
-    fn check_file<S: Into<String>>(&mut self, uri: &str, path: &str, code: S) -> ELSResult<()> {
-        self.send_log(format!("checking {path}"))?;
+    fn check_file<S: Into<String>>(&mut self, uri: Url, code: S) -> ELSResult<()> {
+        self.send_log(format!("checking {uri}"))?;
         let cfg = ErgConfig {
-            input: Input::File(PathBuf::from(path)),
+            input: Input::File(uri.to_file_path().unwrap()),
             mode: "exec",
             opt_level: 1,
             dump_as_pyc: false,
@@ -262,7 +254,7 @@ impl Server {
             Err(errs) => {
                 self.send_log(format!("found errors: {}", errs.len()))?;
                 let diags = errs.into_iter().map(|err| {
-                    let message = err.core.desc.to_string().replace(RED, "").replace(YELLOW, "").replace(RESET, "");
+                    let message = err.core.desc.to_string().replace(RED, "").replace(YELLOW, "").replace(GREEN, "").replace(RESET, "");
                     let start = Position::new(err.core.loc.ln_begin().unwrap() as u32 - 1, err.core.loc.col_begin().unwrap() as u32);
                     let end = Position::new(err.core.loc.ln_end().unwrap() as u32 - 1, err.core.loc.col_end().unwrap() as u32);
                     let err_code = err.core.kind as u8;
@@ -277,7 +269,7 @@ impl Server {
             }
             Ok(_) => {
                 // self.hir = Some(hir);
-                self.send_log(format!("checking {path} passed"))?;
+                self.send_log(format!("checking {} passed", uri.to_file_path().unwrap().to_string_lossy()))?;
                 self.send_diagnostics(uri, vec![])?;
             }
         }
@@ -312,5 +304,96 @@ impl Server {
         }
         // CompletionTriggerKind
         self.send(&json!({ "jsonrpc": "2.0", "id": msg["id"].as_i64().unwrap(), "result": result }))
+    }
+
+    fn show_definition(&mut self, msg: &Value) -> ELSResult<()> {
+        self.send_log(format!("showing definition: {msg}"))?;
+        let params = GotoDefinitionParams::deserialize(&msg["params"])?;
+        let uri = params.text_document_position_params.text_document.uri;
+        let pos = params.text_document_position_params.position;
+        let result = if let Some(token) = Self::get_token(uri.clone(), pos)? {
+            // TODO: check attribute
+            if Self::get_token_relatively(uri.clone(), pos, -1)?
+                .map(|tok| tok.kind == TokenKind::Dot || tok.kind == TokenKind::DblColon).unwrap_or(false)
+            {
+                self.send_log("attribute")?;
+                GotoDefinitionResponse::Array(vec![])
+            } else if !token.category_is(TokenCategory::Symbol) {
+                self.send_log("not symbol")?;
+                GotoDefinitionResponse::Array(vec![])
+            } else if let Ok((name, _)) = self.context.as_ref().unwrap().get_var_info(token.inspect()) {
+                match Self::loc_to_range(name.loc()) {
+                    Some(range) => {
+                        self.send_log("found")?;
+                        GotoDefinitionResponse::Array(vec![lsp_types::Location::new(uri, range)])
+                    }
+                    None => {
+                        self.send_log("not found (maybe builtin)")?;
+                        GotoDefinitionResponse::Array(vec![])
+                    }
+                }
+            } else {
+                self.send_log("not found")?;
+                GotoDefinitionResponse::Array(vec![])
+            }
+        } else {
+            self.send_log("lex error occurred")?;
+            GotoDefinitionResponse::Array(vec![])
+        };
+        self.send(&json!({ "jsonrpc": "2.0", "id": msg["id"].as_i64().unwrap(), "result": result }))
+    }
+
+    fn loc_to_range(loc: erg_common::error::Location) -> Option<Range> {
+        let start = Position::new(loc.ln_begin()? as u32 - 1, loc.col_begin()? as u32);
+        let end = Position::new(loc.ln_end()? as u32 - 1, loc.col_end()? as u32);
+        Some(Range::new(start, end))
+    }
+
+    fn pos_in_loc<L: Locational>(loc: &L, pos: Position) -> bool {
+        (loc.ln_begin().unwrap()..=loc.ln_end().unwrap()).contains(&(pos.line as usize + 1))
+        && (loc.col_begin().unwrap()..=loc.col_end().unwrap()).contains(&(pos.character as usize))
+    }
+
+    fn get_token(uri: Url, pos: Position) -> ELSResult<Option<Token>> {
+        let path = uri.to_file_path().unwrap();
+        let mut code = String::new();
+        File::open(&path)?.read_to_string(&mut code)?;
+        match Lexer::from_str(code).lex() {
+            Ok(tokens) => {
+                let mut token = None;
+                for tok in tokens.into_iter() {
+                    if Self::pos_in_loc(&tok, pos) {
+                        token = Some(tok);
+                        break;
+                    }
+                }
+                Ok(token)
+            }
+            Err(_errs) => {
+                Ok(None)
+            },
+        }
+    }
+
+    /// plus_minus: 0 => same as get_token
+    fn get_token_relatively(uri: Url, pos: Position, plus_minus: isize) -> ELSResult<Option<Token>> {
+        let path = uri.to_file_path().unwrap();
+        let mut code = String::new();
+        File::open(&path)?.read_to_string(&mut code)?;
+        match Lexer::from_str(code).lex() {
+            Ok(tokens) => {
+                let mut found_index = None;
+                for (i, tok) in tokens.iter().enumerate() {
+                    if Self::pos_in_loc(tok, pos) {
+                        found_index = Some(i);
+                        break;
+                    }
+                }
+                Ok(found_index.and_then(|idx| tokens.into_iter().nth((idx as isize + plus_minus) as usize)))
+            }
+            Err(_errs) => {
+                Ok(None)
+            },
+        }
     }
 }

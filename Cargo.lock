@@ -29,15 +29,12 @@ dependencies = [
  "lsp-types",
  "serde",
  "serde_json",
- "url",
- "urlencoding",
 ]
 
 [[package]]
 name = "erg_common"
 version = "0.5.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "73f3c2023836dde51dd501edf6b81e0261db1f8b9efd38eebb425fbfc7330988"
+source = "git+https://github.com/erg-lang/erg?branch=main#62760d1d5e442e6090720805d964ec3e43b7839b"
 dependencies = [
  "atty",
 ]
@@ -45,8 +42,7 @@ dependencies = [
 [[package]]
 name = "erg_compiler"
 version = "0.5.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ba217d67c8d96ffbc509351c724e5febd15f1c63656a6cd66015d8bf02353449"
+source = "git+https://github.com/erg-lang/erg?branch=main#62760d1d5e442e6090720805d964ec3e43b7839b"
 dependencies = [
  "erg_common",
  "erg_parser",
@@ -56,8 +52,7 @@ dependencies = [
 [[package]]
 name = "erg_parser"
 version = "0.5.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fb557003b54e9a03449dc2832196fe4ad3c3e12e47709327db6dd31bf16dffbb"
+source = "git+https://github.com/erg-lang/erg?branch=main#62760d1d5e442e6090720805d964ec3e43b7839b"
 dependencies = [
  "erg_common",
 ]
@@ -65,8 +60,7 @@ dependencies = [
 [[package]]
 name = "erg_type"
 version = "0.5.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "43a06d02d2ac3b7d1ec5b6e04e7df3c25a55e42805fc40c5d7f42014c6ef3b81"
+source = "git+https://github.com/erg-lang/erg?branch=main#62760d1d5e442e6090720805d964ec3e43b7839b"
 dependencies = [
  "erg_common",
  "erg_parser",
@@ -108,9 +102,9 @@ checksum = "6c8af84674fe1f223a982c933a0ee1086ac4d4052aa0fb8060c12c6ad838e754"
 
 [[package]]
 name = "libc"
-version = "0.2.132"
+version = "0.2.133"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8371e4e5341c3a96db127eb2465ac681ced4c433e01dd0e938adbef26ba93ba5"
+checksum = "c0f80d65747a3e43d1596c7c5492d95d5edddaabd45a7fcdb02b95f644164966"
 
 [[package]]
 name = "lsp-types"
@@ -255,12 +249,6 @@ dependencies = [
  "percent-encoding",
  "serde",
 ]
-
-[[package]]
-name = "urlencoding"
-version = "2.1.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e8db7427f936968176eaa7cdf81b7f98b980b18495ec28f1b5791ac3bfe3eea9"
 
 [[package]]
 name = "winapi"
