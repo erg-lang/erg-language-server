@@ -3,8 +3,6 @@ use std::io::{stdin, stdout, Write, StdoutLock, StdinLock, BufRead, Read};
 use std::str::FromStr;
 use std::fs::File;
 
-use erg_compiler::erg_parser::lex::Lexer;
-use erg_compiler::erg_parser::token::Token;
 use serde::{Serialize, Deserialize};
 use serde_json::{Value};
 use serde_json::json;
@@ -15,17 +13,19 @@ use erg_common::traits::{Runnable, Stream, Locational};
 
 use erg_type::Type;
 
+use erg_compiler::erg_parser::lex::Lexer;
 use erg_compiler::erg_parser::ast::VarName;
-use erg_compiler::erg_parser::token::{TokenKind, TokenCategory};
+use erg_compiler::erg_parser::token::{Token, TokenKind, TokenCategory};
 use erg_compiler::AccessKind;
 use erg_compiler::varinfo::VarInfo;
 use erg_compiler::context::Context;
 use erg_compiler::build_hir::HIRBuilder;
+use erg_compiler::hir::{HIR};
 
 use lsp_types::{
     Diagnostic, DiagnosticSeverity, Position, Range, CompletionItem, CompletionItemKind, InitializeResult, ServerCapabilities,
     TextDocumentSyncCapability, TextDocumentSyncKind, CompletionOptions, PublishDiagnosticsParams, Url, OneOf, GotoDefinitionParams, GotoDefinitionResponse,
-    HoverProviderCapability, HoverParams, HoverContents, MarkedString, ClientCapabilities,
+    HoverProviderCapability, HoverParams, HoverContents, MarkedString, ClientCapabilities, CompletionParams,
 };
 
 use crate::message::{LogMessage, ErrorMessage};
@@ -35,6 +35,7 @@ type ELSResult<T> = Result<T, Box<dyn std::error::Error>>;
 pub struct Server {
     client_capas: ClientCapabilities,
     context: Option<Context>,
+    hir: Option<HIR>,
     input: StdinLock<'static>,
     output: StdoutLock<'static>,
 }
@@ -46,6 +47,7 @@ impl Server {
         Self {
             client_capas: ClientCapabilities::default(),
             context: None,
+            hir: None,
             input,
             output,
         }
@@ -107,7 +109,7 @@ impl Server {
         result.capabilities = ServerCapabilities::default();
         result.capabilities.text_document_sync = Some(TextDocumentSyncCapability::from(TextDocumentSyncKind::FULL));
         let mut comp_options = CompletionOptions::default();
-        comp_options.trigger_characters = Some(vec![".".to_string(), "::".to_string()]);
+        comp_options.trigger_characters = Some(vec![".".to_string(), ":".to_string()]);
         result.capabilities.completion_provider = Some(comp_options);
         result.capabilities.definition_provider = Some(OneOf::Left(true));
         result.capabilities.hover_provider = Some(HoverProviderCapability::Simple(true));
@@ -282,8 +284,8 @@ impl Server {
                 }).collect();
                 self.send_diagnostics(uri, diags)?;
             }
-            Ok(_) => {
-                // self.hir = Some(hir);
+            Ok(hir) => {
+                self.hir = Some(hir);
                 self.send_log(format!("checking {} passed", uri.to_file_path().unwrap().to_string_lossy()))?;
                 self.send_diagnostics(uri, vec![])?;
             }
@@ -294,9 +296,13 @@ impl Server {
 
     fn show_completion(&mut self, msg: &Value) -> ELSResult<()> {
         self.send_log(format!("completion requested: {msg}"))?;
-        let trigger = msg["params"]["context"]["triggerCharacter"].as_str();
+        let params = CompletionParams::deserialize(&msg["params"])?;
+        let _uri = params.text_document_position.text_document.uri;
+        let _pos = params.text_document_position.position;
+        let trigger = params.context.as_ref().unwrap().trigger_character.as_ref().map(|s| &s[..]);
         let acc = match trigger {
-            Some(".")| Some("::") => AccessKind::Attr,
+            Some(".") => AccessKind::Attr,
+            Some(":") => AccessKind::Attr, // or type ascription
             _ => AccessKind::Name,
         };
         self.send_log(format!("AccessKind: {acc:?}"))?;
@@ -322,7 +328,7 @@ impl Server {
     }
 
     fn show_definition(&mut self, msg: &Value) -> ELSResult<()> {
-        self.send_log(format!("definition requested : {msg}"))?;
+        self.send_log(format!("definition requested: {msg}"))?;
         let params = GotoDefinitionParams::deserialize(&msg["params"])?;
         let uri = params.text_document_position_params.text_document.uri;
         let pos = params.text_document_position_params.position;
@@ -446,5 +452,9 @@ impl Server {
                 Ok(None)
             },
         }
+    }
+
+    fn _get_receiver_t(&self, _uri: Url, _attr_marker_pos: Position) -> ELSResult<Option<Type>> {
+        todo!()
     }
 }
