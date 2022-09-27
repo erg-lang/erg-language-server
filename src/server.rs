@@ -35,7 +35,7 @@ type ELSResult<T> = Result<T, Box<dyn std::error::Error>>;
 pub struct Server {
     client_capas: ClientCapabilities,
     context: Option<Context>,
-    hir: Option<HIR>,
+    hir: Option<HIR>, // TODO: should be ModuleCache
     input: StdinLock<'static>,
     output: StdoutLock<'static>,
 }
@@ -253,24 +253,24 @@ impl Server {
 
     fn check_file<S: Into<String>>(&mut self, uri: Url, code: S) -> ELSResult<()> {
         self.send_log(format!("checking {uri}"))?;
+        let path = uri.to_file_path().unwrap();
+        // don't use ErgConfig::with_path (cause module is main)
         let cfg = ErgConfig {
-            input: Input::File(uri.to_file_path().unwrap()),
-            mode: "exec",
-            opt_level: 1,
-            dump_as_pyc: false,
-            python_ver: None,
-            py_server_timeout: 10,
-            quiet_startup: false,
-            module: "<module>",
-            verbose: 2,
-            ps1: ">>> ",
-            ps2: "... ",
+            input: Input::File(path),
+            ..ErgConfig::default()
         };
         let mut hir_builder = HIRBuilder::new(cfg);
         match hir_builder.build(code.into(), "exec") {
-            Err(errs) => {
+            Err((hir, errs)) => {
+                self.hir = hir;
                 self.send_log(format!("found errors: {}", errs.len()))?;
-                let diags = errs.into_iter().map(|err| {
+                let mut uri_and_diags: Vec<(Url, Vec<Diagnostic>)> = vec![];
+                for err in errs.into_iter() {
+                    let uri = if let Input::File(path) = err.input {
+                        Url::from_file_path(path).unwrap()
+                    } else {
+                        uri.clone()
+                    };
                     let message = err.core.desc.to_string().replace(RED, "").replace(YELLOW, "").replace(GREEN, "").replace(RESET, "");
                     let start = Position::new(err.core.loc.ln_begin().unwrap() as u32 - 1, err.core.loc.col_begin().unwrap() as u32);
                     let end = Position::new(err.core.loc.ln_end().unwrap() as u32 - 1, err.core.loc.col_end().unwrap() as u32);
@@ -280,13 +280,21 @@ impl Server {
                     } else {
                         DiagnosticSeverity::ERROR
                     };
-                    Diagnostic::new(Range::new(start, end), Some(severity), None, None, message, None, None)
-                }).collect();
-                self.send_diagnostics(uri, diags)?;
+                    let diag = Diagnostic::new(Range::new(start, end), Some(severity), None, None, message, None, None);
+                    if let Some((_, diags)) = uri_and_diags.iter_mut().find(|x| x.0 == uri) {
+                        diags.push(diag);
+                    } else {
+                        uri_and_diags.push((uri, vec![diag]));
+                    }
+                }
+                for (uri, diags) in uri_and_diags.into_iter() {
+                    self.send_log(format!("{uri}, errs: {}", diags.len()))?;
+                    self.send_diagnostics(uri, diags)?;
+                }
             }
             Ok(hir) => {
                 self.hir = Some(hir);
-                self.send_log(format!("checking {} passed", uri.to_file_path().unwrap().to_string_lossy()))?;
+                self.send_log(format!("checking {uri} passed"))?;
                 self.send_diagnostics(uri, vec![])?;
             }
         }
