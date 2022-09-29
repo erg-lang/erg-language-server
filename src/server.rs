@@ -324,8 +324,8 @@ impl Server {
             let mut item = CompletionItem::new_simple(name.to_string(), vi.t.to_string());
             item.kind = match &vi.t {
                 Type::Subr(_) => Some(CompletionItemKind::FUNCTION),
-                Type::Module => Some(CompletionItemKind::MODULE),
                 Type::Class | Type::Trait => Some(CompletionItemKind::CLASS),
+                t if &t.name()[..] == "Module" || &t.name()[..] == "GenericModule" => Some(CompletionItemKind::MODULE),
                 _ if vi.muty.is_const() => Some(CompletionItemKind::CONSTANT),
                 _ => Some(CompletionItemKind::VARIABLE),
             };
