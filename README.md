@@ -1,6 +1,6 @@
 # els (erg-language-server)
 
-ELS is a language server for the [Erg](https://github.com/erg-lang/erg) programing language.
+ELS is a language server for the [Erg](https://github.com/erg-lang/erg) programming language.
 
 ## Features currently implemented
 
