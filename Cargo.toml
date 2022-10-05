@@ -1,6 +1,6 @@
 [package]
 name = "els"
-version = "0.1.4"
+version = "0.1.5-nightly.0"
 edition = "2021"
 description = "An Erg compiler frontend for IDEs, implements LSP."
 authors = ["Shunsuke Shibayama <sbym1346@gmail.com>"]
