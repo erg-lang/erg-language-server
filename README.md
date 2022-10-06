@@ -6,7 +6,7 @@ ELS is a language server for the [Erg](https://github.com/erg-lang/erg) programm
 
 - Code completion
   - Variable completion
-  - Method/attribute completion (WIP)
+  - Method/attribute completion
 - Diagnostics
 - Hover
 - Jump to definition
