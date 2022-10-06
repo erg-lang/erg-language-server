@@ -375,7 +375,7 @@ impl Server {
 
     fn get_definition(&mut self, token: &Token) -> ELSResult<Option<(VarName, VarInfo)>> {
         if !token.category_is(TokenCategory::Symbol) {
-            self.send_log("not symbol")?;
+            self.send_log(format!("not symbol: {token}"))?;
             Ok(None)
         } else if let Ok((name, vi)) = self.context.as_ref().unwrap().get_var_info(token.inspect()) {
             Ok(Some((name.clone(), vi.clone())))
