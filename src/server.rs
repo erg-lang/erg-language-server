@@ -305,8 +305,8 @@ impl Server {
     fn show_completion(&mut self, msg: &Value) -> ELSResult<()> {
         self.send_log(format!("completion requested: {msg}"))?;
         let params = CompletionParams::deserialize(&msg["params"])?;
-        let _uri = params.text_document_position.text_document.uri;
-        let _pos = params.text_document_position.position;
+        let uri = params.text_document_position.text_document.uri;
+        let pos = params.text_document_position.position;
         let trigger = params.context.as_ref().unwrap().trigger_character.as_ref().map(|s| &s[..]);
         let acc = match trigger {
             Some(".") => AccessKind::Attr,
@@ -315,12 +315,18 @@ impl Server {
         };
         self.send_log(format!("AccessKind: {acc:?}"))?;
         let mut result = vec![];
-        let context = if acc.is_local() { self.context.as_ref().unwrap() } else {
-            // TODO: get context
-            self.send(&json!({ "jsonrpc": "2.0", "id": msg["id"].as_i64().unwrap(), "result": result }))?;
-            return Ok(());
-        };
+        let context =
+            if acc.is_local() { self.context.as_ref().unwrap() }
+            else if let Some(ctx) = self.get_receiver_ctx(uri, pos)? {
+                ctx
+            } else {
+                self.send(&json!({ "jsonrpc": "2.0", "id": msg["id"].as_i64().unwrap(), "result": result }))?;
+                return Ok(());
+            };
         for (name, vi) in context.dir().into_iter() {
+            if &context.name[..] != "<module>" && vi.vis.is_private() {
+                continue;
+            }
             let mut item = CompletionItem::new_simple(name.to_string(), vi.t.to_string());
             item.kind = match &vi.t {
                 Type::Subr(_) => Some(CompletionItemKind::FUNCTION),
@@ -331,7 +337,7 @@ impl Server {
             };
             result.push(item);
         }
-        // CompletionTriggerKind
+        self.send_log(format!("completion items: {}", result.len()))?;
         self.send(&json!({ "jsonrpc": "2.0", "id": msg["id"].as_i64().unwrap(), "result": result }))
     }
 
@@ -341,10 +347,9 @@ impl Server {
         let uri = params.text_document_position_params.text_document.uri;
         let pos = params.text_document_position_params.position;
         let result = if let Some(token) = Self::get_token(uri.clone(), pos)? {
+            let prev = self.get_token_relatively(uri.clone(), pos, -1)?;
             // TODO: check attribute
-            if Self::get_token_relatively(uri.clone(), pos, -1)?
-                .map(|tok| tok.kind == TokenKind::Dot || tok.kind == TokenKind::DblColon).unwrap_or(false)
-            {
+            if prev.map(|t| t.is(TokenKind::Dot) || t.is(TokenKind::DblColon)).unwrap_or(false) {
                 self.send_log("attribute")?;
                 GotoDefinitionResponse::Array(vec![])
             } else if let Some((name, _vi)) = self.get_definition(&token)? {
@@ -420,11 +425,13 @@ impl Server {
     }
 
     fn get_token(uri: Url, pos: Position) -> ELSResult<Option<Token>> {
+        // FIXME: detect change
+        let mut timeout = 300;
         let path = uri.to_file_path().unwrap();
-        let mut code = String::new();
-        File::open(&path)?.read_to_string(&mut code)?;
-        match Lexer::from_str(code).lex() {
-            Ok(tokens) => {
+        loop {
+            let mut code = String::new();
+            File::open(&path)?.read_to_string(&mut code)?;
+            if let Ok(tokens) = Lexer::from_str(code).lex() {
                 let mut token = None;
                 for tok in tokens.into_iter() {
                     if Self::pos_in_loc(&tok, pos) {
@@ -432,21 +439,27 @@ impl Server {
                         break;
                     }
                 }
-                Ok(token)
+                if token.is_some() {
+                    return Ok(token);
+                }
             }
-            Err(_errs) => {
-                Ok(None)
-            },
+            std::thread::sleep(std::time::Duration::from_millis(10));
+            timeout -= 1;
+            if timeout == 0 {
+                return Ok(None);
+            }
         }
     }
 
     /// plus_minus: 0 => same as get_token
-    fn get_token_relatively(uri: Url, pos: Position, plus_minus: isize) -> ELSResult<Option<Token>> {
+    fn get_token_relatively(&mut self, uri: Url, pos: Position, plus_minus: isize) -> ELSResult<Option<Token>> {
+        // FIXME: detect change
+        let mut timeout = 300;
         let path = uri.to_file_path().unwrap();
-        let mut code = String::new();
-        File::open(&path)?.read_to_string(&mut code)?;
-        match Lexer::from_str(code).lex() {
-            Ok(tokens) => {
+        loop {
+            let mut code = String::new();
+            File::open(&path)?.read_to_string(&mut code)?;
+            if let Ok(tokens) = Lexer::from_str(code).lex() {
                 let mut found_index = None;
                 for (i, tok) in tokens.iter().enumerate() {
                     if Self::pos_in_loc(tok, pos) {
@@ -454,15 +467,37 @@ impl Server {
                         break;
                     }
                 }
-                Ok(found_index.and_then(|idx| tokens.into_iter().nth((idx as isize + plus_minus) as usize)))
+                if let Some(idx) = found_index {
+                    if let Some(token) = tokens.into_iter().nth((idx as isize + plus_minus) as usize) {
+                        if !token.is(TokenKind::Newline) {
+                            return Ok(Some(token));
+                        }
+                    }
+                }
             }
-            Err(_errs) => {
-                Ok(None)
-            },
+            std::thread::sleep(std::time::Duration::from_millis(10));
+            timeout -= 1;
+            if timeout == 0 {
+                return Ok(None);
+            }
         }
     }
 
-    fn _get_receiver_t(&self, _uri: Url, _attr_marker_pos: Position) -> ELSResult<Option<Type>> {
-        todo!()
+    fn get_receiver_ctx(&mut self, uri: Url, attr_marker_pos: Position) -> ELSResult<Option<&Context>> {
+        let maybe_token = self.get_token_relatively(uri, attr_marker_pos, -1)?;
+        if let Some(token) = maybe_token {
+                if token.is(TokenKind::Symbol) {
+                let var_name = token.inspect();
+                self.send_log(format!("name: {var_name}"))?;
+                let ctx = self.context.as_ref().unwrap().get_receiver_ctx(var_name);
+                Ok(ctx)
+            } else {
+                self.send_log(format!("not name: {token}"))?;
+                Ok(None)
+            }
+        } else {
+            self.send_log("token not found")?;
+            Ok(None)
+        }
     }
 }

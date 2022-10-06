@@ -4,7 +4,9 @@ ELS is a language server for the [Erg](https://github.com/erg-lang/erg) programm
 
 ## Features currently implemented
 
-- Basic code completion
+- Code completion
+  - Variable completion
+  - Method/attribute completion (not completed)
 - Diagnostics
 - Hover
 - Jump to definition
