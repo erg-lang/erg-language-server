@@ -21,7 +21,7 @@ checksum = "bef38d45163c2f1dde094a7dfd33ccf595c92905c8f8f4fdc18d06fb1037718a"
 
 [[package]]
 name = "els"
-version = "0.1.5-nightly.1"
+version = "0.1.5"
 dependencies = [
  "erg_common",
  "erg_compiler",
@@ -33,18 +33,18 @@ dependencies = [
 
 [[package]]
 name = "erg_common"
-version = "0.5.7-nightly.2"
+version = "0.5.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "214f50ecd02d72c3a4507d9122794a004ea00233e3664565876aba06daab0e42"
+checksum = "0223d00a858ee40baf6a72b341e012b8223b9c65b08d672233101be47c984151"
 dependencies = [
  "atty",
 ]
 
 [[package]]
 name = "erg_compiler"
-version = "0.5.7-nightly.2"
+version = "0.5.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b005067eb589d3d726f2700211be311eb87454fdb4aee64baabcc1a47adf09f9"
+checksum = "852bea724ea4687d98494a5c7260e8898d50f7bfec90711c31e7f59a7cf6d20b"
 dependencies = [
  "erg_common",
  "erg_parser",
@@ -53,18 +53,18 @@ dependencies = [
 
 [[package]]
 name = "erg_parser"
-version = "0.5.7-nightly.2"
+version = "0.5.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "50da109068bca1af0c95c11e397978ef4d861cc11101ac9c6fd4d6cf7fc0ac9c"
+checksum = "4421bdd5cde8e45683c410d4e8be499d4e9a9b15475ce7a9bc3c594e02766065"
 dependencies = [
  "erg_common",
 ]
 
 [[package]]
 name = "erg_type"
-version = "0.5.7-nightly.2"
+version = "0.5.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "87d76169b2361dfcede77be0f2ce8eb58a8295131e81f6d0127e88f283435634"
+checksum = "949ed1108ed5f8d085bed28847ed7489f8c4da6641bd6aadf3a78dfa4faacaaf"
 dependencies = [
  "erg_common",
  "erg_parser",
