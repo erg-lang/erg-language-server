@@ -3,17 +3,6 @@
 version = 3
 
 [[package]]
-name = "atty"
-version = "0.2.14"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d9b39be18770d11421cdb1b9947a45dd3f37e93092cbf377614828a319d5fee8"
-dependencies = [
- "hermit-abi",
- "libc",
- "winapi",
-]
-
-[[package]]
 name = "bitflags"
 version = "1.3.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -21,7 +10,7 @@ checksum = "bef38d45163c2f1dde094a7dfd33ccf595c92905c8f8f4fdc18d06fb1037718a"
 
 [[package]]
 name = "els"
-version = "0.1.5"
+version = "0.1.6-nightly.0"
 dependencies = [
  "erg_common",
  "erg_compiler",
@@ -33,18 +22,20 @@ dependencies = [
 
 [[package]]
 name = "erg_common"
-version = "0.5.7"
+version = "0.5.9-nightly.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0223d00a858ee40baf6a72b341e012b8223b9c65b08d672233101be47c984151"
+checksum = "cc35dfec28ebd8f94749955760f1b95e2736f216d0ebfd13e3d20ccbb43e6d16"
 dependencies = [
- "atty",
+ "hermit-abi",
+ "libc",
+ "winapi",
 ]
 
 [[package]]
 name = "erg_compiler"
-version = "0.5.7"
+version = "0.5.9-nightly.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "852bea724ea4687d98494a5c7260e8898d50f7bfec90711c31e7f59a7cf6d20b"
+checksum = "25c0f4c019c894bcf477f669663d5fa63206308a31aec79cb80411c3f2d5f7fc"
 dependencies = [
  "erg_common",
  "erg_parser",
@@ -53,18 +44,18 @@ dependencies = [
 
 [[package]]
 name = "erg_parser"
-version = "0.5.7"
+version = "0.5.9-nightly.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4421bdd5cde8e45683c410d4e8be499d4e9a9b15475ce7a9bc3c594e02766065"
+checksum = "ecf0c54f2dfb111e67985e19face7cd633b2806d648e5bc344a6064890c16069"
 dependencies = [
  "erg_common",
 ]
 
 [[package]]
 name = "erg_type"
-version = "0.5.7"
+version = "0.5.9-nightly.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "949ed1108ed5f8d085bed28847ed7489f8c4da6641bd6aadf3a78dfa4faacaaf"
+checksum = "1a58810546da051bb15eee543b4430d07b234959721912c4f82b5be98ab79b74"
 dependencies = [
  "erg_common",
  "erg_parser",

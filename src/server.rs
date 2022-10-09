@@ -329,8 +329,11 @@ impl Server {
             }
             let mut item = CompletionItem::new_simple(name.to_string(), vi.t.to_string());
             item.kind = match &vi.t {
-                Type::Subr(_) => Some(CompletionItemKind::FUNCTION),
-                Type::Class | Type::Trait => Some(CompletionItemKind::CLASS),
+                Type::Subr(subr) if subr.self_t().is_some() => Some(CompletionItemKind::METHOD),
+                Type::Quantified(quant) if quant.unbound_callable.self_t().is_some() => Some(CompletionItemKind::METHOD),
+                Type::Subr(_) | Type::Quantified(_) => Some(CompletionItemKind::FUNCTION),
+                Type::ClassType => Some(CompletionItemKind::CLASS),
+                Type::TraitType => Some(CompletionItemKind::INTERFACE),
                 t if &t.name()[..] == "Module" || &t.name()[..] == "GenericModule" => Some(CompletionItemKind::MODULE),
                 _ if vi.muty.is_const() => Some(CompletionItemKind::CONSTANT),
                 _ => Some(CompletionItemKind::VARIABLE),
