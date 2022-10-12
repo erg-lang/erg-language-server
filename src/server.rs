@@ -11,8 +11,7 @@ use erg_common::color::{RED, YELLOW, RESET, GREEN};
 use erg_common::config::{ErgConfig, Input};
 use erg_common::traits::{Runnable, Stream, Locational};
 
-use erg_type::Type;
-
+use erg_compiler::ty::Type;
 use erg_compiler::erg_parser::lex::Lexer;
 use erg_compiler::erg_parser::ast::VarName;
 use erg_compiler::erg_parser::token::{Token, TokenKind, TokenCategory};
@@ -298,7 +297,7 @@ impl Server {
                 self.send_diagnostics(uri, vec![])?;
             }
         }
-        self.context = Some(hir_builder.pop_ctx());
+        self.context = Some(hir_builder.pop_mod_ctx());
         Ok(())
     }
 
@@ -334,7 +333,7 @@ impl Server {
                 Type::Subr(_) | Type::Quantified(_) => Some(CompletionItemKind::FUNCTION),
                 Type::ClassType => Some(CompletionItemKind::CLASS),
                 Type::TraitType => Some(CompletionItemKind::INTERFACE),
-                t if &t.name()[..] == "Module" || &t.name()[..] == "GenericModule" => Some(CompletionItemKind::MODULE),
+                t if &t.qual_name()[..] == "Module" || &t.qual_name()[..] == "GenericModule" => Some(CompletionItemKind::MODULE),
                 _ if vi.muty.is_const() => Some(CompletionItemKind::CONSTANT),
                 _ => Some(CompletionItemKind::VARIABLE),
             };
