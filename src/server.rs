@@ -271,8 +271,8 @@ impl Server {
                         uri.clone()
                     };
                     let message = err.core.desc.to_string().replace(RED, "").replace(YELLOW, "").replace(GREEN, "").replace(RESET, "");
-                    let start = Position::new(err.core.loc.ln_begin().unwrap() as u32 - 1, err.core.loc.col_begin().unwrap() as u32);
-                    let end = Position::new(err.core.loc.ln_end().unwrap() as u32 - 1, err.core.loc.col_end().unwrap() as u32);
+                    let start = Position::new(err.core.loc.ln_begin().unwrap_or(1) as u32 - 1, err.core.loc.col_begin().unwrap_or(0) as u32);
+                    let end = Position::new(err.core.loc.ln_end().unwrap_or(1) as u32 - 1, err.core.loc.col_end().unwrap_or(0) as u32);
                     let err_code = err.core.kind as u8;
                     let severity = if (60..=100).contains(&err_code) || (180..=200).contains(&err_code) {
                         DiagnosticSeverity::WARNING
