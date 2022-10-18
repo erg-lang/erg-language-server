@@ -253,13 +253,14 @@ impl Server {
     fn check_file<S: Into<String>>(&mut self, uri: Url, code: S) -> ELSResult<()> {
         self.send_log(format!("checking {uri}"))?;
         let path = uri.to_file_path().unwrap();
+        let mode = if path.to_string_lossy().ends_with("d.er") { "declare" } else { "exec" };
         // don't use ErgConfig::with_path (cause module is main)
         let cfg = ErgConfig {
             input: Input::File(path),
             ..ErgConfig::default()
         };
         let mut hir_builder = HIRBuilder::new(cfg);
-        match hir_builder.build(code.into(), "exec") {
+        match hir_builder.build(code.into(), mode) {
             Err((hir, errs)) => {
                 self.hir = hir;
                 self.send_log(format!("found errors: {}", errs.len()))?;
