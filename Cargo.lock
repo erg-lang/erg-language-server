@@ -21,9 +21,9 @@ dependencies = [
 
 [[package]]
 name = "erg_common"
-version = "0.5.11-nightly.1"
+version = "0.5.11-nightly.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "47dfa8f5524dd59d25fef83a353aed060e2feb25e07f7a6b67163c36a9aa52cb"
+checksum = "dd887a1a97cbd6c9286137468209c543cd1d5ed64605e639b3f87e171e2f0d8f"
 dependencies = [
  "hermit-abi",
  "libc",
@@ -32,9 +32,9 @@ dependencies = [
 
 [[package]]
 name = "erg_compiler"
-version = "0.5.11-nightly.1"
+version = "0.5.11-nightly.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6dfd3fc27fde73f37906186740afeff5bab7c42fe52aa90ac7dba5c31c8711af"
+checksum = "37d429db31ab3c2c91e1279f96fd98a2cedcf56727ba9f0307d77d64e7559b43"
 dependencies = [
  "erg_common",
  "erg_parser",
@@ -42,9 +42,9 @@ dependencies = [
 
 [[package]]
 name = "erg_parser"
-version = "0.5.11-nightly.1"
+version = "0.5.11-nightly.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a5db5ab604aeb879426da98ae8d6f433eee0d12c6eeb64a55dd517df8e5fb42b"
+checksum = "a36a7600b1475c8433ebce7cb9e753df4ba546f627d7a262305506fd5377edfd"
 dependencies = [
  "erg_common",
 ]
