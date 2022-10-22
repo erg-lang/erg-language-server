@@ -10,7 +10,7 @@ checksum = "bef38d45163c2f1dde094a7dfd33ccf595c92905c8f8f4fdc18d06fb1037718a"
 
 [[package]]
 name = "els"
-version = "0.1.8-nightly.2"
+version = "0.1.8-nightly.3"
 dependencies = [
  "erg_common",
  "erg_compiler",
@@ -21,9 +21,9 @@ dependencies = [
 
 [[package]]
 name = "erg_common"
-version = "0.5.11-nightly.3"
+version = "0.5.11-nightly.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "725cec7034c2fc746c4393527e43de1913f24b0c239610911020576307ed6417"
+checksum = "d53d8e6bf8ec4c155bfa23ed0dcb86985e365f80e90f768f6c5d769b116d9fa3"
 dependencies = [
  "hermit-abi",
  "libc",
@@ -32,9 +32,9 @@ dependencies = [
 
 [[package]]
 name = "erg_compiler"
-version = "0.5.11-nightly.3"
+version = "0.5.11-nightly.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f6e225298b9958e033c32754d83afd90d97c0cf1cb8943956115cd92b0c42dc3"
+checksum = "f03775d5196387d4d72d1c60e4adec48a4d86675a1e25073eca0e38d7289d52e"
 dependencies = [
  "erg_common",
  "erg_parser",
@@ -42,9 +42,9 @@ dependencies = [
 
 [[package]]
 name = "erg_parser"
-version = "0.5.11-nightly.3"
+version = "0.5.11-nightly.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "36c36a8476dc0cd1bda087f0f9f7e1d2fd3d2a004f3778f2c12351e5f5bdd555"
+checksum = "4abf27e3509116e1bc45520f4c842acf5ecd3572326db2ea792c916c4c47d547"
 dependencies = [
  "erg_common",
 ]
