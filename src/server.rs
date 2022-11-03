@@ -253,7 +253,7 @@ impl Server {
     fn check_file<S: Into<String>>(&mut self, uri: Url, code: S) -> ELSResult<()> {
         self.send_log(format!("checking {uri}"))?;
         let path = uri.to_file_path().unwrap();
-        let mode = if path.to_string_lossy().ends_with("d.er") { "declare" } else { "exec" };
+        let mode = if path.to_string_lossy().ends_with(".d.er") { "declare" } else { "exec" };
         // don't use ErgConfig::with_path (cause module is main)
         let cfg = ErgConfig {
             input: Input::File(path),
@@ -330,7 +330,7 @@ impl Server {
             let mut item = CompletionItem::new_simple(name.to_string(), vi.t.to_string());
             item.kind = match &vi.t {
                 Type::Subr(subr) if subr.self_t().is_some() => Some(CompletionItemKind::METHOD),
-                Type::Quantified(quant) if quant.unbound_callable.self_t().is_some() => Some(CompletionItemKind::METHOD),
+                Type::Quantified(quant) if quant.self_t().is_some() => Some(CompletionItemKind::METHOD),
                 Type::Subr(_) | Type::Quantified(_) => Some(CompletionItemKind::FUNCTION),
                 Type::ClassType => Some(CompletionItemKind::CLASS),
                 Type::TraitType => Some(CompletionItemKind::INTERFACE),
