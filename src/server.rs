@@ -261,11 +261,11 @@ impl Server {
         };
         let mut hir_builder = HIRBuilder::new(cfg);
         match hir_builder.build(code.into(), mode) {
-            Err((hir, errs)) => {
-                self.hir = hir;
-                self.send_log(format!("found errors: {}", errs.len()))?;
+            Err(artifact) => {
+                self.hir = artifact.hir;
+                self.send_log(format!("found errors: {}", artifact.errors.len()))?;
                 let mut uri_and_diags: Vec<(Url, Vec<Diagnostic>)> = vec![];
-                for err in errs.into_iter() {
+                for err in artifact.errors.into_iter() {
                     let uri = if let Input::File(path) = err.input {
                         Url::from_file_path(path).unwrap()
                     } else {
@@ -292,8 +292,8 @@ impl Server {
                     self.send_diagnostics(uri, diags)?;
                 }
             }
-            Ok(hir) => {
-                self.hir = Some(hir);
+            Ok(artifact) => {
+                self.hir = Some(artifact.hir);
                 self.send_log(format!("checking {uri} passed"))?;
                 self.send_diagnostics(uri, vec![])?;
             }
