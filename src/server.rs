@@ -250,6 +250,10 @@ impl Server {
         }
     }
 
+    fn remove_escape(msg: &str) -> String {
+        msg.replace(RED, "").replace(YELLOW, "").replace(GREEN, "").replace(RESET, "")
+    }
+
     fn check_file<S: Into<String>>(&mut self, uri: Url, code: S) -> ELSResult<()> {
         self.send_log(format!("checking {uri}"))?;
         let path = uri.to_file_path().unwrap();
@@ -271,7 +275,7 @@ impl Server {
                     } else {
                         uri.clone()
                     };
-                    let message = err.core.desc.to_string().replace(RED, "").replace(YELLOW, "").replace(GREEN, "").replace(RESET, "");
+                    let message = Self::remove_escape(&err.core.desc);
                     let start = Position::new(err.core.loc.ln_begin().unwrap_or(1) as u32 - 1, err.core.loc.col_begin().unwrap_or(0) as u32);
                     let end = Position::new(err.core.loc.ln_end().unwrap_or(1) as u32 - 1, err.core.loc.col_end().unwrap_or(0) as u32);
                     let err_code = err.core.kind as u8;
