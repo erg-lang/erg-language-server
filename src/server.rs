@@ -7,7 +7,7 @@ use serde::{Serialize, Deserialize};
 use serde_json::{Value};
 use serde_json::json;
 
-use erg_common::color::{RED, YELLOW, RESET, GREEN};
+use erg_common::style::{RED, YELLOW, RESET, GREEN};
 use erg_common::config::{ErgConfig, Input};
 use erg_common::traits::{Runnable, Stream, Locational};
 
