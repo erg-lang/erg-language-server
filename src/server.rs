@@ -7,7 +7,7 @@ use serde::{Serialize, Deserialize};
 use serde_json::{Value};
 use serde_json::json;
 
-use erg_common::style::{RED, YELLOW, RESET, GREEN};
+use erg_common::style::*;
 use erg_common::config::{ErgConfig, Input};
 use erg_common::traits::{Runnable, Stream, Locational};
 
@@ -251,7 +251,19 @@ impl Server {
     }
 
     fn remove_escape(msg: &str) -> String {
-        msg.replace(RED, "").replace(YELLOW, "").replace(GREEN, "").replace(RESET, "")
+        msg.replace(RED, "")
+            .replace(YELLOW, "")
+            .replace(GREEN, "")
+            .replace(CYAN, "")
+            .replace(BLUE, "")
+            .replace(MAGENTA, "")
+            .replace(GRAY, "")
+            .replace(WHITE, "")
+            .replace(BLACK, "")
+            .replace(BOLD, "")
+            .replace(UNDERLINE, "")
+            .replace(ATTR_RESET, "")
+            .replace(RESET, "")
     }
 
     fn check_file<S: Into<String>>(&mut self, uri: Url, code: S) -> ELSResult<()> {
