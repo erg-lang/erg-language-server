@@ -16,6 +16,7 @@ use erg_compiler::erg_parser::lex::Lexer;
 use erg_compiler::erg_parser::ast::VarName;
 use erg_compiler::erg_parser::token::{Token, TokenKind, TokenCategory};
 use erg_compiler::AccessKind;
+use erg_compiler::error::CompileErrors;
 use erg_compiler::varinfo::VarInfo;
 use erg_compiler::context::Context;
 use erg_compiler::build_hir::HIRBuilder;
@@ -277,45 +278,55 @@ impl Server {
         };
         let mut hir_builder = HIRBuilder::new(cfg);
         match hir_builder.build(code.into(), mode) {
-            Err(artifact) => {
-                self.hir = artifact.hir;
-                self.send_log(format!("found errors: {}", artifact.errors.len()))?;
-                let mut uri_and_diags: Vec<(Url, Vec<Diagnostic>)> = vec![];
-                for err in artifact.errors.into_iter() {
-                    let uri = if let Input::File(path) = err.input {
-                        Url::from_file_path(path).unwrap()
-                    } else {
-                        uri.clone()
-                    };
-                    let message = Self::remove_escape(&err.core.main_message);
-                    let start = Position::new(err.core.loc.ln_begin().unwrap_or(1) as u32 - 1, err.core.loc.col_begin().unwrap_or(0) as u32);
-                    let end = Position::new(err.core.loc.ln_end().unwrap_or(1) as u32 - 1, err.core.loc.col_end().unwrap_or(0) as u32);
-                    let err_code = err.core.kind as u8;
-                    let severity = if (60..=100).contains(&err_code) || (180..=200).contains(&err_code) {
-                        DiagnosticSeverity::WARNING
-                    } else {
-                        DiagnosticSeverity::ERROR
-                    };
-                    let diag = Diagnostic::new(Range::new(start, end), Some(severity), None, None, message, None, None);
-                    if let Some((_, diags)) = uri_and_diags.iter_mut().find(|x| x.0 == uri) {
-                        diags.push(diag);
-                    } else {
-                        uri_and_diags.push((uri, vec![diag]));
-                    }
-                }
-                for (uri, diags) in uri_and_diags.into_iter() {
-                    self.send_log(format!("{uri}, errs: {}", diags.len()))?;
-                    self.send_diagnostics(uri, diags)?;
-                }
-            }
             Ok(artifact) => {
                 self.hir = Some(artifact.hir);
                 self.send_log(format!("checking {uri} passed"))?;
-                self.send_diagnostics(uri, vec![])?;
+                let uri_and_diags = self.make_uri_and_diags(uri, artifact.warns);
+                for (uri, diags) in uri_and_diags.into_iter() {
+                    self.send_log(format!("{uri}, warns: {}", diags.len()))?;
+                    self.send_diagnostics(uri, diags)?;
+                }
+            }
+            Err(mut artifact) => {
+                self.hir = artifact.hir;
+                self.send_log(format!("found errors: {}", artifact.errors.len()))?;
+                self.send_log(format!("found warns: {}", artifact.warns.len()))?;
+                artifact.errors.extend(artifact.warns);
+                let uri_and_diags = self.make_uri_and_diags(uri, artifact.errors);
+                for (uri, diags) in uri_and_diags.into_iter() {
+                    self.send_log(format!("{uri}, errs & warns: {}", diags.len()))?;
+                    self.send_diagnostics(uri, diags)?;
+                }
             }
         }
         self.context = Some(hir_builder.pop_mod_ctx());
         Ok(())
+    }
+
+    fn make_uri_and_diags(&mut self, uri: Url, errors: CompileErrors) -> Vec<(Url, Vec<Diagnostic>)> {
+        let mut uri_and_diags: Vec<(Url, Vec<Diagnostic>)> = vec![];
+        for err in errors.into_iter() {
+            let uri = if let Input::File(path) = err.input {
+                Url::from_file_path(path).unwrap()
+            } else {
+                uri.clone()
+            };
+            let message = Self::remove_escape(&err.core.main_message);
+            let start = Position::new(err.core.loc.ln_begin().unwrap_or(1) as u32 - 1, err.core.loc.col_begin().unwrap_or(0) as u32);
+            let end = Position::new(err.core.loc.ln_end().unwrap_or(1) as u32 - 1, err.core.loc.col_end().unwrap_or(0) as u32);
+            let severity = if err.core.kind.is_warning() {
+                DiagnosticSeverity::WARNING
+            } else {
+                DiagnosticSeverity::ERROR
+            };
+            let diag = Diagnostic::new(Range::new(start, end), Some(severity), None, None, message, None, None);
+            if let Some((_, diags)) = uri_and_diags.iter_mut().find(|x| x.0 == uri) {
+                diags.push(diag);
+            } else {
+                uri_and_diags.push((uri, vec![diag]));
+            }
+        }
+        uri_and_diags
     }
 
     fn show_completion(&mut self, msg: &Value) -> ELSResult<()> {
