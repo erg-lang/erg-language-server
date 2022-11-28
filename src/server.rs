@@ -279,20 +279,27 @@ impl Server {
         let mut hir_builder = HIRBuilder::new(cfg);
         match hir_builder.build(code.into(), mode) {
             Ok(artifact) => {
-                self.hir = Some(artifact.hir);
+                self.hir = Some(artifact.object);
                 self.send_log(format!("checking {uri} passed"))?;
-                let uri_and_diags = self.make_uri_and_diags(uri, artifact.warns);
+                let uri_and_diags = self.make_uri_and_diags(uri.clone(), artifact.warns);
+                // clear previous diagnostics
+                if uri_and_diags.is_empty() {
+                    self.send_diagnostics(uri, vec![])?;
+                }
                 for (uri, diags) in uri_and_diags.into_iter() {
                     self.send_log(format!("{uri}, warns: {}", diags.len()))?;
                     self.send_diagnostics(uri, diags)?;
                 }
             }
             Err(mut artifact) => {
-                self.hir = artifact.hir;
+                self.hir = artifact.object;
                 self.send_log(format!("found errors: {}", artifact.errors.len()))?;
                 self.send_log(format!("found warns: {}", artifact.warns.len()))?;
                 artifact.errors.extend(artifact.warns);
-                let uri_and_diags = self.make_uri_and_diags(uri, artifact.errors);
+                let uri_and_diags = self.make_uri_and_diags(uri.clone(), artifact.errors);
+                if uri_and_diags.is_empty() {
+                    self.send_diagnostics(uri, vec![])?;
+                }
                 for (uri, diags) in uri_and_diags.into_iter() {
                     self.send_log(format!("{uri}, errs & warns: {}", diags.len()))?;
                     self.send_diagnostics(uri, diags)?;
