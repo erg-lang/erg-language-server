@@ -28,6 +28,7 @@ use lsp_types::{
     HoverProviderCapability, HoverParams, HoverContents, MarkedString, ClientCapabilities, CompletionParams,
 };
 
+use crate::hir_visitor::visit_hir_t;
 use crate::message::{LogMessage, ErrorMessage};
 
 type ELSResult<T> = Result<T, Box<dyn std::error::Error>>;
@@ -100,11 +101,11 @@ impl Server {
     #[allow(clippy::field_reassign_with_default)]
     fn init(&mut self, msg: &Value, id: i64) -> ELSResult<()> {
         self.send_log("initializing ELS")?;
-        #[allow(clippy::collapsible_if)]
+        // #[allow(clippy::collapsible_if)]
         if msg.get("params").is_some() && msg["params"].get("capabilities").is_some() {
             self.client_capas = ClientCapabilities::deserialize(&msg["params"]["capabilities"])?;
+            // self.send_log(format!("set client capabilities: {:?}", self.client_capas))?;
         }
-        // self.send_log(format!("set client capabilities: {:?}", self.client_capas))?;
         let mut result = InitializeResult::default();
         result.capabilities = ServerCapabilities::default();
         result.capabilities.text_document_sync = Some(TextDocumentSyncCapability::from(TextDocumentSyncKind::FULL));
@@ -113,6 +114,7 @@ impl Server {
         result.capabilities.completion_provider = Some(comp_options);
         result.capabilities.definition_provider = Some(OneOf::Left(true));
         result.capabilities.hover_provider = Some(HoverProviderCapability::Simple(true));
+        result.capabilities.inlay_hint_provider = Some(OneOf::Left(true));
         self.send(&json!({
             "jsonrpc": "2.0",
             "id": id,
@@ -428,7 +430,18 @@ impl Server {
         let uri = params.text_document_position_params.text_document.uri;
         let pos = params.text_document_position_params.position;
         let mut contents = vec![];
-        match Self::get_token(uri.clone(), pos)?.map(|tok| self.get_definition(&tok)).transpose()? {
+        let opt_tok = Self::get_token(uri.clone(), pos)?;
+        let opt_token = if let Some(token) = opt_tok {
+            match token.category() {
+                TokenCategory::StrInterpRight => self.get_token_relatively(uri.clone(), pos, -1)?,
+                TokenCategory::StrInterpLeft => self.get_token_relatively(uri.clone(), pos, 1)?,
+                // TODO: StrInterpMid
+                _ => Some(token),
+            }
+        } else {
+            None
+        };
+        match opt_token.as_ref().map(|tok| self.get_definition(tok)).transpose()? {
             Some(Some((name, vi))) => {
                 if let Some(line) = name.ln_begin() {
                     let path = uri.to_file_path().unwrap();
@@ -440,7 +453,15 @@ impl Server {
                 contents.push(typ);
             }
             // not found or not symbol, etc.
-            Some(None) => {}
+            Some(None) => {
+                let token = opt_token.unwrap();
+                if let Some(hir) = &self.hir {
+                    if let Some(t) = visit_hir_t(hir, &token) {
+                        let typ = MarkedString::from_language_code("erg".into(), format!(": {t}"));
+                        contents.push(typ);
+                    }
+                }
+            }
             // lex error, etc.
             None => {
                 self.send_log("lex error")?;
@@ -470,7 +491,7 @@ impl Server {
             File::open(&path)?.read_to_string(&mut code)?;
             if let Ok(tokens) = Lexer::from_str(code).lex() {
                 let mut token = None;
-                for tok in tokens.payload().into_iter() {
+                for tok in tokens.into_iter() {
                     if Self::pos_in_loc(&tok, pos) {
                         token = Some(tok);
                         break;
@@ -505,7 +526,7 @@ impl Server {
                     }
                 }
                 if let Some(idx) = found_index {
-                    if let Some(token) = tokens.payload().into_iter().nth((idx as isize + plus_minus) as usize) {
+                    if let Some(token) = tokens.into_iter().nth((idx as isize + plus_minus) as usize) {
                         if !token.is(TokenKind::Newline) {
                             return Ok(Some(token));
                         }
