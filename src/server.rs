@@ -457,7 +457,7 @@ impl Server {
                 let token = opt_token.unwrap();
                 if let Some(hir) = &self.hir {
                     if let Some(t) = visit_hir_t(hir, &token) {
-                        let typ = MarkedString::from_language_code("erg".into(), format!(": {t}"));
+                        let typ = MarkedString::from_language_code("erg".into(), format!("{}: {t}", token.content));
                         contents.push(typ);
                     }
                 }
