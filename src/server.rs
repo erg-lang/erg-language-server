@@ -320,7 +320,18 @@ impl Server {
             } else {
                 uri.clone()
             };
-            let message = Self::remove_escape(&err.core.main_message);
+            let mut message = Self::remove_escape(&err.core.main_message);
+            for sub in err.core.sub_messages {
+                for msg in sub.get_msg() {
+                    message.push('\n');
+                    message.push_str(&Self::remove_escape(msg));
+                }
+                if let Some(hint) = sub.get_hint() {
+                    message.push('\n');
+                    message.push_str("hint: ");
+                    message.push_str(&Self::remove_escape(hint));
+                }
+            }
             let start = Position::new(err.core.loc.ln_begin().unwrap_or(1) as u32 - 1, err.core.loc.col_begin().unwrap_or(0) as u32);
             let end = Position::new(err.core.loc.ln_end().unwrap_or(1) as u32 - 1, err.core.loc.col_end().unwrap_or(0) as u32);
             let severity = if err.core.kind.is_warning() {
