@@ -367,7 +367,7 @@ impl Server {
         let params = CompletionParams::deserialize(&msg["params"])?;
         let uri = params.text_document_position.text_document.uri;
         let pos = params.text_document_position.position;
-        let trigger = params.context.as_ref().unwrap().trigger_character.as_ref().map(|s| &s[..]);
+        let trigger = params.context.as_ref().and_then(|ctx| ctx.trigger_character.as_ref().map(|s| &s[..]));
         let acc = match trigger {
             Some(".") => AccessKind::Attr,
             Some(":") => AccessKind::Attr, // or type ascription
@@ -440,7 +440,7 @@ impl Server {
         if !token.category_is(TokenCategory::Symbol) {
             self.send_log(format!("not symbol: {token}"))?;
             Ok(None)
-        } else if let Some((name, vi)) = self.context.as_ref().unwrap().get_var_info(token.inspect()) {
+        } else if let Some((name, vi)) = self.context.as_ref().and_then(|ctx| ctx.get_var_info(token.inspect())) {
             Ok(Some((name.clone(), vi.clone())))
         } else {
             self.send_log("not found")?;
@@ -469,7 +469,7 @@ impl Server {
             Some(Some((name, vi))) => {
                 if let Some(line) = name.ln_begin() {
                     let path = uri.to_file_path().unwrap();
-                    let code_block = BufReader::new(File::open(&path)?).lines().nth(line - 1).unwrap()?;
+                    let code_block = BufReader::new(File::open(&path)?).lines().nth(line - 1).unwrap_or_else(|| Ok(String::new()))?;
                     let definition = MarkedString::from_language_code("erg".into(), code_block);
                     contents.push(definition);
                 }
@@ -502,8 +502,8 @@ impl Server {
     }
 
     fn pos_in_loc<L: Locational>(loc: &L, pos: Position) -> bool {
-        (loc.ln_begin().unwrap()..=loc.ln_end().unwrap()).contains(&(pos.line as usize + 1))
-        && (loc.col_begin().unwrap()..=loc.col_end().unwrap()).contains(&(pos.character as usize))
+        (loc.ln_begin().unwrap_or(0)..=loc.ln_end().unwrap_or(0)).contains(&(pos.line as usize + 1))
+        && (loc.col_begin().unwrap_or(0)..=loc.col_end().unwrap_or(0)).contains(&(pos.character as usize))
     }
 
     fn get_token(uri: Url, pos: Position) -> ELSResult<Option<Token>> {
@@ -571,7 +571,7 @@ impl Server {
                 if token.is(TokenKind::Symbol) {
                 let var_name = token.inspect();
                 self.send_log(format!("name: {var_name}"))?;
-                let ctx = self.context.as_ref().unwrap().get_receiver_ctx(var_name);
+                let ctx = self.context.as_ref().and_then(|ctx| ctx.get_receiver_ctx(var_name));
                 Ok(ctx)
             } else {
                 self.send_log(format!("not name: {token}"))?;
