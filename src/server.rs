@@ -3,6 +3,7 @@ use std::io::{stdin, stdout, Write, StdoutLock, StdinLock, BufRead, Read};
 use std::str::FromStr;
 use std::fs::File;
 
+use erg_common::error::ErrorCore;
 use serde::{Serialize, Deserialize};
 use serde_json::{Value};
 use serde_json::json;
@@ -312,9 +313,21 @@ impl Server {
         Ok(())
     }
 
+    fn find_fallback_loc(err: &ErrorCore) -> erg_common::error::Location {
+        if err.loc == erg_common::error::Location::Unknown {
+            for sub in &err.sub_messages {
+                if sub.loc != erg_common::error::Location::Unknown {
+                    return sub.loc;
+                }
+            }
+            erg_common::error::Location::Unknown
+        } else { err.loc }
+    }
+
     fn make_uri_and_diags(&mut self, uri: Url, errors: CompileErrors) -> Vec<(Url, Vec<Diagnostic>)> {
         let mut uri_and_diags: Vec<(Url, Vec<Diagnostic>)> = vec![];
         for err in errors.into_iter() {
+            let loc = Self::find_fallback_loc(&err.core);
             let uri = if let Input::File(path) = err.input {
                 Url::from_file_path(path).unwrap()
             } else {
@@ -332,8 +345,8 @@ impl Server {
                     message.push_str(&Self::remove_escape(hint));
                 }
             }
-            let start = Position::new(err.core.loc.ln_begin().unwrap_or(1) as u32 - 1, err.core.loc.col_begin().unwrap_or(0) as u32);
-            let end = Position::new(err.core.loc.ln_end().unwrap_or(1) as u32 - 1, err.core.loc.col_end().unwrap_or(0) as u32);
+            let start = Position::new(loc.ln_begin().unwrap_or(1) as u32 - 1, loc.col_begin().unwrap_or(0) as u32);
+            let end = Position::new(loc.ln_end().unwrap_or(1) as u32 - 1, loc.col_end().unwrap_or(0) as u32);
             let severity = if err.core.kind.is_warning() {
                 DiagnosticSeverity::WARNING
             } else {
