@@ -3,7 +3,6 @@ use std::io::{stdin, stdout, Write, StdoutLock, StdinLock, BufRead, Read};
 use std::str::FromStr;
 use std::fs::File;
 
-use erg_common::error::ErrorCore;
 use serde::{Serialize, Deserialize};
 use serde_json::{Value};
 use serde_json::json;
@@ -254,22 +253,6 @@ impl Server {
         }
     }
 
-    fn remove_escape(msg: &str) -> String {
-        msg.replace(RED, "")
-            .replace(YELLOW, "")
-            .replace(GREEN, "")
-            .replace(CYAN, "")
-            .replace(BLUE, "")
-            .replace(MAGENTA, "")
-            .replace(GRAY, "")
-            .replace(WHITE, "")
-            .replace(BLACK, "")
-            .replace(BOLD, "")
-            .replace(UNDERLINE, "")
-            .replace(ATTR_RESET, "")
-            .replace(RESET, "")
-    }
-
     fn check_file<S: Into<String>>(&mut self, uri: Url, code: S) -> ELSResult<()> {
         self.send_log(format!("checking {uri}"))?;
         let path = uri.to_file_path().unwrap();
@@ -313,36 +296,25 @@ impl Server {
         Ok(())
     }
 
-    fn find_fallback_loc(err: &ErrorCore) -> erg_common::error::Location {
-        if err.loc == erg_common::error::Location::Unknown {
-            for sub in &err.sub_messages {
-                if sub.loc != erg_common::error::Location::Unknown {
-                    return sub.loc;
-                }
-            }
-            erg_common::error::Location::Unknown
-        } else { err.loc }
-    }
-
     fn make_uri_and_diags(&mut self, uri: Url, errors: CompileErrors) -> Vec<(Url, Vec<Diagnostic>)> {
         let mut uri_and_diags: Vec<(Url, Vec<Diagnostic>)> = vec![];
         for err in errors.into_iter() {
-            let loc = Self::find_fallback_loc(&err.core);
+            let loc = err.core.get_loc_with_fallback();
             let uri = if let Input::File(path) = err.input {
                 Url::from_file_path(path).unwrap()
             } else {
                 uri.clone()
             };
-            let mut message = Self::remove_escape(&err.core.main_message);
+            let mut message = remove_style(&err.core.main_message);
             for sub in err.core.sub_messages {
                 for msg in sub.get_msg() {
                     message.push('\n');
-                    message.push_str(&Self::remove_escape(msg));
+                    message.push_str(&remove_style(msg));
                 }
                 if let Some(hint) = sub.get_hint() {
                     message.push('\n');
                     message.push_str("hint: ");
-                    message.push_str(&Self::remove_escape(hint));
+                    message.push_str(&remove_style(hint));
                 }
             }
             let start = Position::new(loc.ln_begin().unwrap_or(1) as u32 - 1, loc.col_begin().unwrap_or(0) as u32);
