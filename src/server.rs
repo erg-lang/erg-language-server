@@ -9,13 +9,14 @@ use serde_json::json;
 
 use erg_common::style::*;
 use erg_common::config::{ErgConfig, Input};
-use erg_common::traits::{Runnable, Stream, Locational};
+use erg_common::traits::{Stream, Locational};
 
 use erg_compiler::ty::Type;
 use erg_compiler::erg_parser::lex::Lexer;
 use erg_compiler::erg_parser::ast::VarName;
 use erg_compiler::erg_parser::token::{Token, TokenKind, TokenCategory};
 use erg_compiler::AccessKind;
+use erg_compiler::artifact::BuildRunnable;
 use erg_compiler::error::CompileErrors;
 use erg_compiler::varinfo::VarInfo;
 use erg_compiler::context::Context;
@@ -33,15 +34,19 @@ use crate::message::{LogMessage, ErrorMessage};
 
 type ELSResult<T> = Result<T, Box<dyn std::error::Error>>;
 
-pub struct Server {
+pub type ErgLanguageServer = Server<HIRBuilder>;
+
+/// A Language Server, which can be used any object implementing `BuildRunnable` internally by passing it as a generic parameter.
+pub struct Server<Checker: BuildRunnable = HIRBuilder> {
     client_capas: ClientCapabilities,
     context: Option<Context>,
     hir: Option<HIR>, // TODO: should be ModuleCache
     input: StdinLock<'static>,
     output: StdoutLock<'static>,
+    _checker: std::marker::PhantomData<Checker>,
 }
 
-impl Server {
+impl<Checker: BuildRunnable> Server<Checker> {
     pub fn new() -> Self {
         let input = stdin().lock();
         let output = stdout().lock();
@@ -51,6 +56,7 @@ impl Server {
             hir: None,
             input,
             output,
+            _checker: std::marker::PhantomData,
         }
     }
 
@@ -262,8 +268,8 @@ impl Server {
             input: Input::File(path),
             ..ErgConfig::default()
         };
-        let mut hir_builder = HIRBuilder::new(cfg);
-        match hir_builder.build(code.into(), mode) {
+        let mut checker = Checker::new(cfg);
+        match checker.build(code.into(), mode) {
             Ok(artifact) => {
                 self.hir = Some(artifact.object);
                 self.send_log(format!("checking {uri} passed"))?;
@@ -292,7 +298,7 @@ impl Server {
                 }
             }
         }
-        self.context = Some(hir_builder.pop_mod_ctx());
+        self.context = checker.pop_context();
         Ok(())
     }
 

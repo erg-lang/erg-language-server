@@ -39,6 +39,7 @@ fn visit_expr_t(expr: &Expr, token: &Token) -> Option<Type> {
         Expr::Set(set) => visit_set_t(set, token),
         Expr::Tuple(tuple) => visit_tuple_t(tuple, token),
         Expr::TypeAsc(type_asc) => visit_expr_t(&type_asc.expr, token),
+        Expr::Dummy(dummy) => visit_dummy_t(dummy, token),
         Expr::Import(_) | Expr::Compound(_) | Expr::AttrDef(_) | Expr::Code(_) => None,
     }
 }
@@ -82,6 +83,15 @@ fn visit_class_def_t(class_def: &ClassDef, token: &Token) -> Option<Type> {
 
 fn visit_block_t(block: &Block, token: &Token) -> Option<Type> {
     for chunk in block.iter() {
+        if let Some(expr) = visit_expr_t(chunk, token) {
+            return Some(expr);
+        }
+    }
+    None
+}
+
+fn visit_dummy_t(dummy: &Dummy, token: &Token) -> Option<Type> {
+    for chunk in dummy.iter() {
         if let Some(expr) = visit_expr_t(chunk, token) {
             return Some(expr);
         }
@@ -177,6 +187,7 @@ fn visit_expr<'e>(expr: &'e Expr, token: &Token) -> Option<&'e Expr> {
         Expr::Set(set) => visit_set(set, token),
         Expr::Tuple(tuple) => visit_tuple(tuple, token),
         Expr::TypeAsc(type_asc) => visit_expr(&type_asc.expr, token),
+        Expr::Dummy(dummy) => visit_dummy(dummy, token),
         Expr::Import(_) | Expr::Compound(_) | Expr::AttrDef(_) | Expr::Code(_) => None,
     }
 }
@@ -215,6 +226,15 @@ fn visit_class_def<'c>(class_def: &'c ClassDef, token: &Token) -> Option<&'c Exp
 
 fn visit_block<'b>(block: &'b Block, token: &Token) -> Option<&'b Expr> {
     for chunk in block.iter() {
+        if let Some(expr) = visit_expr(chunk, token) {
+            return Some(expr);
+        }
+    }
+    None
+}
+
+fn visit_dummy<'d>(dummy: &'d Dummy, token: &Token) -> Option<&'d Expr> {
+    for chunk in dummy.iter() {
         if let Some(expr) = visit_expr(chunk, token) {
             return Some(expr);
         }

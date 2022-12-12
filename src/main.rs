@@ -3,6 +3,6 @@ mod message;
 mod hir_visitor;
 
 fn main() {
-    let mut server = server::Server::new();
+    let mut server = server::ErgLanguageServer::new();
     server.run().unwrap();
 }
