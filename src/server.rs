@@ -37,6 +37,7 @@ type ELSResult<T> = Result<T, Box<dyn std::error::Error>>;
 pub type ErgLanguageServer = Server<HIRBuilder>;
 
 /// A Language Server, which can be used any object implementing `BuildRunnable` internally by passing it as a generic parameter.
+#[derive(Debug)]
 pub struct Server<Checker: BuildRunnable = HIRBuilder> {
     client_capas: ClientCapabilities,
     context: Option<Context>,
@@ -47,6 +48,7 @@ pub struct Server<Checker: BuildRunnable = HIRBuilder> {
 }
 
 impl<Checker: BuildRunnable> Server<Checker> {
+    #[allow(clippy::new_without_default)]
     pub fn new() -> Self {
         let input = stdin().lock();
         let output = stdout().lock();
