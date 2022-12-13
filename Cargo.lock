@@ -22,7 +22,7 @@ dependencies = [
 [[package]]
 name = "erg_common"
 version = "0.6.0-beta.2"
-source = "git+https://github.com/erg-lang/erg?branch=main#a1cd55825f3840e809aa045617743ee26e3d8afd"
+source = "git+https://github.com/erg-lang/erg?branch=pylyzer-mode#dea0d722b00703997ba3cd3e944a584c8ee31f3d"
 dependencies = [
  "hermit-abi",
  "libc",
@@ -32,7 +32,7 @@ dependencies = [
 [[package]]
 name = "erg_compiler"
 version = "0.6.0-beta.2"
-source = "git+https://github.com/erg-lang/erg?branch=main#a1cd55825f3840e809aa045617743ee26e3d8afd"
+source = "git+https://github.com/erg-lang/erg?branch=pylyzer-mode#dea0d722b00703997ba3cd3e944a584c8ee31f3d"
 dependencies = [
  "erg_common",
  "erg_parser",
@@ -41,7 +41,7 @@ dependencies = [
 [[package]]
 name = "erg_parser"
 version = "0.6.0-beta.2"
-source = "git+https://github.com/erg-lang/erg?branch=main#a1cd55825f3840e809aa045617743ee26e3d8afd"
+source = "git+https://github.com/erg-lang/erg?branch=pylyzer-mode#dea0d722b00703997ba3cd3e944a584c8ee31f3d"
 dependencies = [
  "erg_common",
  "unicode-xid",
