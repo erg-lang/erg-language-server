@@ -54,7 +54,7 @@ fn visit_bin_t(bin: &BinOp, token: &Token) -> Option<Type> {
 
 fn visit_call_t(call: &Call, token: &Token) -> Option<Type> {
     if let Some(attr) = &call.attr_name {
-        if attr.name.token() == token {
+        if attr.name.token().deep_eq(token) {
             return Some(attr.t());
         }
     }

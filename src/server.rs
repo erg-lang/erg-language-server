@@ -556,9 +556,15 @@ impl<Checker: BuildRunnable> Server<Checker> {
                     });
                 Ok(ctx)
             } else {
-                let opt_t = self.hir.as_ref().and_then(|hir| visit_hir_t(hir, &token));
-                let ctx = opt_t.and_then(|t| self.context.as_ref().and_then(|ctx| ctx.get_receiver_ctx(&t.to_string())));
-                Ok(ctx)
+                self.send_log(format!("non-name token: {token}"))?;
+                if let Some(typ) = self.hir.as_ref().and_then(|hir| visit_hir_t(hir, &token)) {
+                    let t_name = typ.qual_name();
+                    self.send_log(format!("type: {t_name}"))?;
+                    let ctx = self.context.as_ref().and_then(|ctx| ctx.get_receiver_ctx(&t_name));
+                    Ok(ctx)
+                } else {
+                    Ok(None)
+                }
             }
         } else {
             self.send_log("token not found")?;
