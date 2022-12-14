@@ -426,6 +426,7 @@ impl<Checker: BuildRunnable> Server<Checker> {
 
     fn show_hover(&mut self, msg: &Value) -> ELSResult<()> {
         self.send_log(format!("hover requested : {msg}"))?;
+        let lang = if self.cfg.python_compatible_mode { "python" } else { "erg" };
         let params = HoverParams::deserialize(&msg["params"])?;
         let uri = params.text_document_position_params.text_document.uri;
         let pos = params.text_document_position_params.position;
@@ -446,10 +447,10 @@ impl<Checker: BuildRunnable> Server<Checker> {
                 if let Some(line) = name.ln_begin() {
                     let path = uri.to_file_path().unwrap();
                     let code_block = BufReader::new(File::open(&path)?).lines().nth(line - 1).unwrap_or_else(|| Ok(String::new()))?;
-                    let definition = MarkedString::from_language_code("erg".into(), code_block);
+                    let definition = MarkedString::from_language_code(lang.into(), code_block);
                     contents.push(definition);
                 }
-                let typ = MarkedString::from_language_code("erg".into(), format!("{name}: {}", vi.t));
+                let typ = MarkedString::from_language_code(lang.into(), format!("{name}: {}", vi.t));
                 contents.push(typ);
             }
             // not found or not symbol, etc.
@@ -457,7 +458,7 @@ impl<Checker: BuildRunnable> Server<Checker> {
                 let token = opt_token.unwrap();
                 if let Some(hir) = &self.hir {
                     if let Some(t) = visit_hir_t(hir, &token) {
-                        let typ = MarkedString::from_language_code("erg".into(), format!("{}: {t}", token.content));
+                        let typ = MarkedString::from_language_code(lang.into(), format!("{}: {t}", token.content));
                         contents.push(typ);
                     }
                 }
@@ -544,14 +545,20 @@ impl<Checker: BuildRunnable> Server<Checker> {
     fn get_receiver_ctx(&mut self, uri: Url, attr_marker_pos: Position) -> ELSResult<Option<&Context>> {
         let maybe_token = self.get_token_relatively(uri, attr_marker_pos, -1)?;
         if let Some(token) = maybe_token {
-                if token.is(TokenKind::Symbol) {
+            if token.is(TokenKind::Symbol) {
                 let var_name = token.inspect();
                 self.send_log(format!("name: {var_name}"))?;
-                let ctx = self.context.as_ref().and_then(|ctx| ctx.get_receiver_ctx(var_name));
+                let ctx = self.context.as_ref()
+                    .and_then(|ctx| ctx.get_receiver_ctx(var_name))
+                    .or_else(|| {
+                        let opt_t = self.hir.as_ref().and_then(|hir| visit_hir_t(hir, &token));
+                        opt_t.and_then(|t| self.context.as_ref().and_then(|ctx| ctx.get_receiver_ctx(&t.to_string())))
+                    });
                 Ok(ctx)
             } else {
-                self.send_log(format!("not name: {token}"))?;
-                Ok(None)
+                let opt_t = self.hir.as_ref().and_then(|hir| visit_hir_t(hir, &token));
+                let ctx = opt_t.and_then(|t| self.context.as_ref().and_then(|ctx| ctx.get_receiver_ctx(&t.to_string())));
+                Ok(ctx)
             }
         } else {
             self.send_log("token not found")?;
