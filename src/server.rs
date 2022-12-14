@@ -29,7 +29,7 @@ use lsp_types::{
     HoverProviderCapability, HoverParams, HoverContents, MarkedString, ClientCapabilities, CompletionParams,
 };
 
-use crate::hir_visitor::visit_hir_t;
+use crate::hir_visitor::HIRVisitor;
 use crate::message::{LogMessage, ErrorMessage};
 
 type ELSResult<T> = Result<T, Box<dyn std::error::Error>>;
@@ -457,7 +457,8 @@ impl<Checker: BuildRunnable> Server<Checker> {
             Some(None) => {
                 let token = opt_token.unwrap();
                 if let Some(hir) = &self.hir {
-                    if let Some(t) = visit_hir_t(hir, &token) {
+                    let visitor = HIRVisitor::new(hir, !self.cfg.python_compatible_mode);
+                    if let Some(t) = visitor.visit_hir_t(&token) {
                         let typ = MarkedString::from_language_code(lang.into(), format!("{}: {t}", token.content));
                         contents.push(typ);
                     }
@@ -551,13 +552,19 @@ impl<Checker: BuildRunnable> Server<Checker> {
                 let ctx = self.context.as_ref()
                     .and_then(|ctx| ctx.get_receiver_ctx(var_name))
                     .or_else(|| {
-                        let opt_t = self.hir.as_ref().and_then(|hir| visit_hir_t(hir, &token));
+                        let opt_t = self.hir.as_ref().and_then(|hir| {
+                            let visitor = HIRVisitor::new(hir, !self.cfg.python_compatible_mode);
+                            visitor.visit_hir_t(&token)
+                        });
                         opt_t.and_then(|t| self.context.as_ref().and_then(|ctx| ctx.get_receiver_ctx(&t.to_string())))
                     });
                 Ok(ctx)
             } else {
                 self.send_log(format!("non-name token: {token}"))?;
-                if let Some(typ) = self.hir.as_ref().and_then(|hir| visit_hir_t(hir, &token)) {
+                if let Some(typ) = self.hir.as_ref().and_then(|hir| {
+                    let visitor = HIRVisitor::new(hir, !self.cfg.python_compatible_mode);
+                    visitor.visit_hir_t(&token)
+                }) {
                     let t_name = typ.qual_name();
                     self.send_log(format!("type: {t_name}"))?;
                     let ctx = self.context.as_ref().and_then(|ctx| ctx.get_receiver_ctx(&t_name));
