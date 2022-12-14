@@ -29,7 +29,7 @@ use lsp_types::{
     HoverProviderCapability, HoverParams, HoverContents, MarkedString, ClientCapabilities, CompletionParams,
 };
 
-use crate::hir_visitor::visit_hir_t;
+use crate::hir_visitor::HIRVisitor;
 use crate::message::{LogMessage, ErrorMessage};
 
 type ELSResult<T> = Result<T, Box<dyn std::error::Error>>;
@@ -39,6 +39,7 @@ pub type ErgLanguageServer = Server<HIRBuilder>;
 /// A Language Server, which can be used any object implementing `BuildRunnable` internally by passing it as a generic parameter.
 #[derive(Debug)]
 pub struct Server<Checker: BuildRunnable = HIRBuilder> {
+    cfg: ErgConfig,
     client_capas: ClientCapabilities,
     context: Option<Context>,
     hir: Option<HIR>, // TODO: should be ModuleCache
@@ -48,11 +49,11 @@ pub struct Server<Checker: BuildRunnable = HIRBuilder> {
 }
 
 impl<Checker: BuildRunnable> Server<Checker> {
-    #[allow(clippy::new_without_default)]
-    pub fn new() -> Self {
+    pub fn new(cfg: ErgConfig) -> Self {
         let input = stdin().lock();
         let output = stdout().lock();
         Self {
+            cfg,
             client_capas: ClientCapabilities::default(),
             context: None,
             hir: None,
@@ -265,12 +266,7 @@ impl<Checker: BuildRunnable> Server<Checker> {
         self.send_log(format!("checking {uri}"))?;
         let path = uri.to_file_path().unwrap();
         let mode = if path.to_string_lossy().ends_with(".d.er") { "declare" } else { "exec" };
-        // don't use ErgConfig::with_path (cause module is main)
-        let cfg = ErgConfig {
-            input: Input::File(path),
-            ..ErgConfig::default()
-        };
-        let mut checker = Checker::new(cfg);
+        let mut checker = Checker::new(self.cfg.inherit(path));
         match checker.build(code.into(), mode) {
             Ok(artifact) => {
                 self.hir = Some(artifact.object);
@@ -430,6 +426,7 @@ impl<Checker: BuildRunnable> Server<Checker> {
 
     fn show_hover(&mut self, msg: &Value) -> ELSResult<()> {
         self.send_log(format!("hover requested : {msg}"))?;
+        let lang = if self.cfg.python_compatible_mode { "python" } else { "erg" };
         let params = HoverParams::deserialize(&msg["params"])?;
         let uri = params.text_document_position_params.text_document.uri;
         let pos = params.text_document_position_params.position;
@@ -450,18 +447,19 @@ impl<Checker: BuildRunnable> Server<Checker> {
                 if let Some(line) = name.ln_begin() {
                     let path = uri.to_file_path().unwrap();
                     let code_block = BufReader::new(File::open(&path)?).lines().nth(line - 1).unwrap_or_else(|| Ok(String::new()))?;
-                    let definition = MarkedString::from_language_code("erg".into(), code_block);
+                    let definition = MarkedString::from_language_code(lang.into(), code_block);
                     contents.push(definition);
                 }
-                let typ = MarkedString::from_language_code("erg".into(), format!("{name}: {}", vi.t));
+                let typ = MarkedString::from_language_code(lang.into(), format!("{name}: {}", vi.t));
                 contents.push(typ);
             }
             // not found or not symbol, etc.
             Some(None) => {
                 let token = opt_token.unwrap();
                 if let Some(hir) = &self.hir {
-                    if let Some(t) = visit_hir_t(hir, &token) {
-                        let typ = MarkedString::from_language_code("erg".into(), format!("{}: {t}", token.content));
+                    let visitor = HIRVisitor::new(hir, !self.cfg.python_compatible_mode);
+                    if let Some(t) = visitor.visit_hir_t(&token) {
+                        let typ = MarkedString::from_language_code(lang.into(), format!("{}: {t}", token.content));
                         contents.push(typ);
                     }
                 }
@@ -548,14 +546,32 @@ impl<Checker: BuildRunnable> Server<Checker> {
     fn get_receiver_ctx(&mut self, uri: Url, attr_marker_pos: Position) -> ELSResult<Option<&Context>> {
         let maybe_token = self.get_token_relatively(uri, attr_marker_pos, -1)?;
         if let Some(token) = maybe_token {
-                if token.is(TokenKind::Symbol) {
+            if token.is(TokenKind::Symbol) {
                 let var_name = token.inspect();
                 self.send_log(format!("name: {var_name}"))?;
-                let ctx = self.context.as_ref().and_then(|ctx| ctx.get_receiver_ctx(var_name));
+                let ctx = self.context.as_ref()
+                    .and_then(|ctx| ctx.get_receiver_ctx(var_name))
+                    .or_else(|| {
+                        let opt_t = self.hir.as_ref().and_then(|hir| {
+                            let visitor = HIRVisitor::new(hir, !self.cfg.python_compatible_mode);
+                            visitor.visit_hir_t(&token)
+                        });
+                        opt_t.and_then(|t| self.context.as_ref().and_then(|ctx| ctx.get_receiver_ctx(&t.to_string())))
+                    });
                 Ok(ctx)
             } else {
-                self.send_log(format!("not name: {token}"))?;
-                Ok(None)
+                self.send_log(format!("non-name token: {token}"))?;
+                if let Some(typ) = self.hir.as_ref().and_then(|hir| {
+                    let visitor = HIRVisitor::new(hir, !self.cfg.python_compatible_mode);
+                    visitor.visit_hir_t(&token)
+                }) {
+                    let t_name = typ.qual_name();
+                    self.send_log(format!("type: {t_name}"))?;
+                    let ctx = self.context.as_ref().and_then(|ctx| ctx.get_receiver_ctx(&t_name));
+                    Ok(ctx)
+                } else {
+                    Ok(None)
+                }
             }
         } else {
             self.send_log("token not found")?;
