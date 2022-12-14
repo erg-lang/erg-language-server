@@ -40,7 +40,8 @@ fn visit_expr_t(expr: &Expr, token: &Token) -> Option<Type> {
         Expr::Tuple(tuple) => visit_tuple_t(tuple, token),
         Expr::TypeAsc(type_asc) => visit_expr_t(&type_asc.expr, token),
         Expr::Dummy(dummy) => visit_dummy_t(dummy, token),
-        Expr::Import(_) | Expr::Compound(_) | Expr::AttrDef(_) | Expr::Code(_) => None,
+        Expr::Compound(block) | Expr::Code(block) => visit_block_t(block, token),
+        Expr::Import(_) | Expr::AttrDef(_) => None,
     }
 }
 
@@ -188,7 +189,8 @@ fn visit_expr<'e>(expr: &'e Expr, token: &Token) -> Option<&'e Expr> {
         Expr::Tuple(tuple) => visit_tuple(tuple, token),
         Expr::TypeAsc(type_asc) => visit_expr(&type_asc.expr, token),
         Expr::Dummy(dummy) => visit_dummy(dummy, token),
-        Expr::Import(_) | Expr::Compound(_) | Expr::AttrDef(_) | Expr::Code(_) => None,
+        Expr::Compound(block) | Expr::Code(block) => visit_block(block, token),
+        Expr::Import(_) | Expr::AttrDef(_) => None,
     }
 }
 
