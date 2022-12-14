@@ -1,4 +1,4 @@
-use erg_common::traits::Stream;
+use erg_common::traits::{Stream, Locational};
 use erg_compiler::hir::*;
 use erg_compiler::erg_parser::token::Token;
 use erg_compiler::ty::{HasType, Type};
@@ -14,12 +14,15 @@ pub(crate) fn visit_hir_t(hir: &HIR, token: &Token) -> Option<Type> {
 }
 
 fn visit_expr_t(expr: &Expr, token: &Token) -> Option<Type> {
+    if expr.col_end() < token.col_begin() {
+        return None;
+    }
     match expr {
-        Expr::Lit(lit) => if &lit.token == token { Some(expr.t()) } else { None },
+        Expr::Lit(lit) => if lit.token.deep_eq(token) { Some(expr.t()) } else { None },
         Expr::Accessor(acc) => match acc {
-            Accessor::Ident(ident) => if ident.name.token() == token { Some(expr.t()) } else { None },
+            Accessor::Ident(ident) => if ident.name.token().deep_eq(token) { Some(expr.t()) } else { None },
             Accessor::Attr(attr) => {
-                if attr.ident.name.token() == token {
+                if attr.ident.name.token().deep_eq(token) {
                     Some(expr.t())
                 } else {
                     visit_expr_t(&attr.obj, token)
@@ -163,12 +166,15 @@ pub(crate) fn visit_hir<'h>(hir: &'h HIR, token: &Token) -> Option<&'h Expr> {
 }
 
 fn visit_expr<'e>(expr: &'e Expr, token: &Token) -> Option<&'e Expr> {
+    if expr.col_end() < token.col_begin() {
+        return None;
+    }
     match expr {
-        Expr::Lit(lit) => if &lit.token == token { Some(expr) } else { None },
+        Expr::Lit(lit) => if lit.token.deep_eq(token) { Some(expr) } else { None },
         Expr::Accessor(acc) => match acc {
-            Accessor::Ident(ident) => if ident.name.token() == token { Some(expr) } else { None },
+            Accessor::Ident(ident) => if ident.name.token().deep_eq(token) { Some(expr) } else { None },
             Accessor::Attr(attr) => {
-                if attr.ident.name.token() == token {
+                if attr.ident.name.token().deep_eq(token) {
                     Some(expr)
                 } else {
                     visit_expr(&attr.obj, token)
