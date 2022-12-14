@@ -39,6 +39,7 @@ pub type ErgLanguageServer = Server<HIRBuilder>;
 /// A Language Server, which can be used any object implementing `BuildRunnable` internally by passing it as a generic parameter.
 #[derive(Debug)]
 pub struct Server<Checker: BuildRunnable = HIRBuilder> {
+    cfg: ErgConfig,
     client_capas: ClientCapabilities,
     context: Option<Context>,
     hir: Option<HIR>, // TODO: should be ModuleCache
@@ -48,11 +49,11 @@ pub struct Server<Checker: BuildRunnable = HIRBuilder> {
 }
 
 impl<Checker: BuildRunnable> Server<Checker> {
-    #[allow(clippy::new_without_default)]
-    pub fn new() -> Self {
+    pub fn new(cfg: ErgConfig) -> Self {
         let input = stdin().lock();
         let output = stdout().lock();
         Self {
+            cfg,
             client_capas: ClientCapabilities::default(),
             context: None,
             hir: None,
@@ -265,12 +266,7 @@ impl<Checker: BuildRunnable> Server<Checker> {
         self.send_log(format!("checking {uri}"))?;
         let path = uri.to_file_path().unwrap();
         let mode = if path.to_string_lossy().ends_with(".d.er") { "declare" } else { "exec" };
-        // don't use ErgConfig::with_path (cause module is main)
-        let cfg = ErgConfig {
-            input: Input::File(path),
-            ..ErgConfig::default()
-        };
-        let mut checker = Checker::new(cfg);
+        let mut checker = Checker::new(self.cfg.inherit(path));
         match checker.build(code.into(), mode) {
             Ok(artifact) => {
                 self.hir = Some(artifact.object);
