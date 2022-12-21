@@ -254,7 +254,7 @@ impl<Checker: BuildRunnable> Server<Checker> {
                 self.send_log(format!("{method}: {uri}"))?;
                 let path = uri.to_file_path().unwrap();
                 let mut code = String::new();
-                File::open(&path)?.read_to_string(&mut code)?;
+                File::open(path)?.read_to_string(&mut code)?;
                 self.check_file(uri, &code)
             },
             // "textDocument/didChange"
@@ -446,7 +446,7 @@ impl<Checker: BuildRunnable> Server<Checker> {
             Some(Some((name, vi))) => {
                 if let Some(line) = name.ln_begin() {
                     let path = uri.to_file_path().unwrap();
-                    let code_block = BufReader::new(File::open(&path)?).lines().nth(line - 1).unwrap_or_else(|| Ok(String::new()))?;
+                    let code_block = BufReader::new(File::open(path)?).lines().nth(line - 1).unwrap_or_else(|| Ok(String::new()))?;
                     let definition = MarkedString::from_language_code(lang.into(), code_block);
                     contents.push(definition);
                 }
@@ -490,7 +490,7 @@ impl<Checker: BuildRunnable> Server<Checker> {
         let path = uri.to_file_path().unwrap();
         loop {
             let mut code = String::new();
-            File::open(&path)?.read_to_string(&mut code)?;
+            File::open(path.as_path())?.read_to_string(&mut code)?;
             if let Ok(tokens) = Lexer::from_str(code).lex() {
                 let mut token = None;
                 for tok in tokens.into_iter() {
@@ -518,7 +518,7 @@ impl<Checker: BuildRunnable> Server<Checker> {
         let path = uri.to_file_path().unwrap();
         loop {
             let mut code = String::new();
-            File::open(&path)?.read_to_string(&mut code)?;
+            File::open(path.as_path())?.read_to_string(&mut code)?;
             if let Ok(tokens) = Lexer::from_str(code).lex() {
                 let mut found_index = None;
                 for (i, tok) in tokens.iter().enumerate() {
