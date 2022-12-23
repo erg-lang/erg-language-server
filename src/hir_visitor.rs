@@ -97,7 +97,8 @@ impl<'a> HIRVisitor<'a> {
     }
 
     fn visit_class_def_t(&self, class_def: &ClassDef, token: &Token) -> Option<Type> {
-        self.visit_expr_t(&class_def.require_or_sup, token)
+        class_def.require_or_sup.as_ref()
+            .and_then(|req_sup| self.visit_expr_t(req_sup, token))
             .or_else(|| self.visit_block_t(&class_def.methods, token))
     }
 
@@ -245,7 +246,8 @@ fn visit_args<'a>(args: &'a Args, token: &Token) -> Option<&'a Expr> {
 }
 
 fn visit_class_def<'c>(class_def: &'c ClassDef, token: &Token) -> Option<&'c Expr> {
-    visit_expr(&class_def.require_or_sup, token)
+    class_def.require_or_sup.as_ref()
+        .and_then(|req_sup| visit_expr(req_sup, token))
         .or_else(|| visit_block(&class_def.methods, token))
 }
 

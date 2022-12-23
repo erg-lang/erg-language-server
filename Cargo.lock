@@ -21,8 +21,8 @@ dependencies = [
 
 [[package]]
 name = "erg_common"
-version = "0.6.0-beta.3"
-source = "git+https://github.com/erg-lang/erg?branch=main#08aa4054a19828511ae36514276f42f35ad502ff"
+version = "0.6.0-beta.4"
+source = "git+https://github.com/erg-lang/erg?branch=main#d8f7e386c88fa59f141c30a28998f955eff64fc4"
 dependencies = [
  "hermit-abi",
  "libc",
@@ -31,8 +31,8 @@ dependencies = [
 
 [[package]]
 name = "erg_compiler"
-version = "0.6.0-beta.3"
-source = "git+https://github.com/erg-lang/erg?branch=main#08aa4054a19828511ae36514276f42f35ad502ff"
+version = "0.6.0-beta.4"
+source = "git+https://github.com/erg-lang/erg?branch=main#d8f7e386c88fa59f141c30a28998f955eff64fc4"
 dependencies = [
  "erg_common",
  "erg_parser",
@@ -40,8 +40,8 @@ dependencies = [
 
 [[package]]
 name = "erg_parser"
-version = "0.6.0-beta.3"
-source = "git+https://github.com/erg-lang/erg?branch=main#08aa4054a19828511ae36514276f42f35ad502ff"
+version = "0.6.0-beta.4"
+source = "git+https://github.com/erg-lang/erg?branch=main#d8f7e386c88fa59f141c30a28998f955eff64fc4"
 dependencies = [
  "erg_common",
  "unicode-xid",
@@ -83,9 +83,9 @@ checksum = "fad582f4b9e86b6caa621cabeb0963332d92eea04729ab12892c2533951e6440"
 
 [[package]]
 name = "libc"
-version = "0.2.138"
+version = "0.2.139"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "db6d7e329c562c5dfab7a46a2afabc8b987ab9a4834c9d1ca04dc54c1546cef8"
+checksum = "201de327520df007757c1f0adce6e827fe8562fbc28bfd9c15571c66ca1f5f79"
 
 [[package]]
 name = "lsp-types"
