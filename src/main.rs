@@ -1,6 +1,6 @@
-mod server;
-mod message;
 mod hir_visitor;
+mod message;
+mod server;
 
 use erg_common::config::ErgConfig;
 

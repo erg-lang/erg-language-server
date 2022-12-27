@@ -1,6 +1,6 @@
-use erg_common::traits::{Stream, Locational};
-use erg_compiler::hir::*;
+use erg_common::traits::{Locational, Stream};
 use erg_compiler::erg_parser::token::Token;
+use erg_compiler::hir::*;
 use erg_compiler::ty::{HasType, Type};
 
 pub struct HIRVisitor<'a> {
@@ -10,10 +10,7 @@ pub struct HIRVisitor<'a> {
 
 impl<'a> HIRVisitor<'a> {
     pub fn new(hir: &'a HIR, strict_cmp: bool) -> Self {
-        Self {
-            hir,
-            strict_cmp
-        }
+        Self { hir, strict_cmp }
     }
 
     /// Returns the smallest expression containing `token`. Literals, accessors, containers, etc. are returned.
@@ -28,10 +25,16 @@ impl<'a> HIRVisitor<'a> {
 
     fn cmp_return_expr_t<T: HasType>(&self, expr: &T, l: &Token, r: &Token) -> Option<Type> {
         if self.strict_cmp {
-            if l.deep_eq(r) { Some(expr.t()) } else { None }
+            if l.deep_eq(r) {
+                Some(expr.t())
+            } else {
+                None
+            }
         } else if l == r {
             Some(expr.t())
-        } else { None }
+        } else {
+            None
+        }
     }
 
     fn visit_expr_t(&self, expr: &Expr, token: &Token) -> Option<Type> {
@@ -40,32 +43,39 @@ impl<'a> HIRVisitor<'a> {
         }
         match expr {
             Expr::Lit(lit) => self.cmp_return_expr_t(expr, &lit.token, token),
-            Expr::Accessor(acc) => match acc {
-                Accessor::Ident(ident) => self.cmp_return_expr_t(expr, ident.name.token(), token),
-                Accessor::Attr(attr) => self.cmp_return_expr_t(expr, attr.ident.name.token(), token)
-                    .or_else(|| self.visit_expr_t(&attr.obj, token)),
-            },
+            Expr::Accessor(acc) => self.visit_acc_t(expr, acc, token),
             Expr::BinOp(bin) => self.visit_bin_t(bin, token),
             Expr::UnaryOp(unary) => self.visit_expr_t(&unary.expr, token),
-            Expr::Call(call) =>self.visit_call_t(call, token),
-            Expr::ClassDef(class_def) =>self.visit_class_def_t(class_def, token),
-            Expr::Def(def) =>self.visit_block_t(&def.body.block, token),
-            Expr::PatchDef(patch_def) =>self.visit_patchdef_t(patch_def, token),
-            Expr::Lambda(lambda) =>self.visit_block_t(&lambda.body, token),
-            Expr::Array(arr) =>self.visit_array_t(arr, token),
-            Expr::Dict(dict) =>self.visit_dict_t(dict, token),
-            Expr::Record(record) =>self.visit_record_t(record, token),
-            Expr::Set(set) =>self.visit_set_t(set, token),
-            Expr::Tuple(tuple) =>self.visit_tuple_t(tuple, token),
-            Expr::TypeAsc(type_asc) =>self.visit_expr_t(&type_asc.expr, token),
-            Expr::Dummy(dummy) =>self.visit_dummy_t(dummy, token),
-            Expr::Compound(block) | Expr::Code(block) =>self.visit_block_t(block, token),
-            Expr::Import(_) | Expr::AttrDef(_) => None,
+            Expr::Call(call) => self.visit_call_t(call, token),
+            Expr::ClassDef(class_def) => self.visit_class_def_t(class_def, token),
+            Expr::Def(def) => self.visit_block_t(&def.body.block, token),
+            Expr::PatchDef(patch_def) => self.visit_patchdef_t(patch_def, token),
+            Expr::Lambda(lambda) => self.visit_block_t(&lambda.body, token),
+            Expr::Array(arr) => self.visit_array_t(arr, token),
+            Expr::Dict(dict) => self.visit_dict_t(dict, token),
+            Expr::Record(record) => self.visit_record_t(record, token),
+            Expr::Set(set) => self.visit_set_t(set, token),
+            Expr::Tuple(tuple) => self.visit_tuple_t(tuple, token),
+            Expr::TypeAsc(type_asc) => self.visit_expr_t(&type_asc.expr, token),
+            Expr::Dummy(dummy) => self.visit_dummy_t(dummy, token),
+            Expr::Compound(block) | Expr::Code(block) => self.visit_block_t(block, token),
+            Expr::ReDef(redef) => self.visit_redef_t(expr, redef, token),
+            Expr::Import(_) => None,
+        }
+    }
+
+    fn visit_acc_t(&self, expr: &Expr, acc: &Accessor, token: &Token) -> Option<Type> {
+        match acc {
+            Accessor::Ident(ident) => self.cmp_return_expr_t(expr, ident.name.token(), token),
+            Accessor::Attr(attr) => self
+                .cmp_return_expr_t(expr, attr.ident.name.token(), token)
+                .or_else(|| self.visit_expr_t(&attr.obj, token)),
         }
     }
 
     fn visit_bin_t(&self, bin: &BinOp, token: &Token) -> Option<Type> {
-        self.visit_expr_t(&bin.lhs, token).or_else(|| self.visit_expr_t(&bin.rhs, token))
+        self.visit_expr_t(&bin.lhs, token)
+            .or_else(|| self.visit_expr_t(&bin.rhs, token))
     }
 
     fn visit_call_t(&self, call: &Call, token: &Token) -> Option<Type> {
@@ -74,7 +84,8 @@ impl<'a> HIRVisitor<'a> {
                 return Some(t);
             }
         }
-        self.visit_expr_t(&call.obj, token).or_else(|| self.visit_args_t(&call.args, token))
+        self.visit_expr_t(&call.obj, token)
+            .or_else(|| self.visit_args_t(&call.args, token))
     }
 
     fn visit_args_t(&self, args: &Args, token: &Token) -> Option<Type> {
@@ -97,7 +108,9 @@ impl<'a> HIRVisitor<'a> {
     }
 
     fn visit_class_def_t(&self, class_def: &ClassDef, token: &Token) -> Option<Type> {
-        class_def.require_or_sup.as_ref()
+        class_def
+            .require_or_sup
+            .as_ref()
             .and_then(|req_sup| self.visit_expr_t(req_sup, token))
             .or_else(|| self.visit_block_t(&class_def.methods, token))
     }
@@ -109,6 +122,11 @@ impl<'a> HIRVisitor<'a> {
             }
         }
         None
+    }
+
+    fn visit_redef_t(&self, expr: &Expr, redef: &ReDef, token: &Token) -> Option<Type> {
+        self.visit_acc_t(expr, &redef.attr, token)
+            .or_else(|| self.visit_block_t(&redef.block, token))
     }
 
     fn visit_dummy_t(&self, dummy: &Dummy, token: &Token) -> Option<Type> {
@@ -188,17 +206,14 @@ fn visit_expr<'e>(expr: &'e Expr, token: &Token) -> Option<&'e Expr> {
         return None;
     }
     match expr {
-        Expr::Lit(lit) => if lit.token.deep_eq(token) { Some(expr) } else { None },
-        Expr::Accessor(acc) => match acc {
-            Accessor::Ident(ident) => if ident.name.token().deep_eq(token) { Some(expr) } else { None },
-            Accessor::Attr(attr) => {
-                if attr.ident.name.token().deep_eq(token) {
-                    Some(expr)
-                } else {
-                    visit_expr(&attr.obj, token)
-                }
-            },
-        },
+        Expr::Lit(lit) => {
+            if lit.token.deep_eq(token) {
+                Some(expr)
+            } else {
+                None
+            }
+        }
+        Expr::Accessor(acc) => visit_acc(expr, acc, token),
         Expr::BinOp(bin) => visit_bin(bin, token),
         Expr::UnaryOp(unary) => visit_expr(&unary.expr, token),
         Expr::Call(call) => visit_call(call, token),
@@ -214,7 +229,27 @@ fn visit_expr<'e>(expr: &'e Expr, token: &Token) -> Option<&'e Expr> {
         Expr::TypeAsc(type_asc) => visit_expr(&type_asc.expr, token),
         Expr::Dummy(dummy) => visit_dummy(dummy, token),
         Expr::Compound(block) | Expr::Code(block) => visit_block(block, token),
-        Expr::Import(_) | Expr::AttrDef(_) => None,
+        Expr::ReDef(redef) => visit_redef(expr, redef, token),
+        Expr::Import(_) => None,
+    }
+}
+
+fn visit_acc<'a>(expr: &'a Expr, acc: &'a Accessor, token: &Token) -> Option<&'a Expr> {
+    match acc {
+        Accessor::Ident(ident) => {
+            if ident.name.token().deep_eq(token) {
+                Some(expr)
+            } else {
+                None
+            }
+        }
+        Accessor::Attr(attr) => {
+            if attr.ident.name.token().deep_eq(token) {
+                Some(expr)
+            } else {
+                visit_expr(&attr.obj, token)
+            }
+        }
     }
 }
 
@@ -246,7 +281,9 @@ fn visit_args<'a>(args: &'a Args, token: &Token) -> Option<&'a Expr> {
 }
 
 fn visit_class_def<'c>(class_def: &'c ClassDef, token: &Token) -> Option<&'c Expr> {
-    class_def.require_or_sup.as_ref()
+    class_def
+        .require_or_sup
+        .as_ref()
         .and_then(|req_sup| visit_expr(req_sup, token))
         .or_else(|| visit_block(&class_def.methods, token))
 }
@@ -260,6 +297,10 @@ fn visit_block<'b>(block: &'b Block, token: &Token) -> Option<&'b Expr> {
     None
 }
 
+fn visit_redef<'r>(expr: &'r Expr, redef: &'r ReDef, token: &Token) -> Option<&'r Expr> {
+    visit_acc(expr, &redef.attr, token).or_else(|| visit_block(&redef.block, token))
+}
+
 fn visit_dummy<'d>(dummy: &'d Dummy, token: &Token) -> Option<&'d Expr> {
     for chunk in dummy.iter() {
         if let Some(expr) = visit_expr(chunk, token) {
@@ -270,8 +311,7 @@ fn visit_dummy<'d>(dummy: &'d Dummy, token: &Token) -> Option<&'d Expr> {
 }
 
 fn visit_patchdef<'p>(patch_def: &'p PatchDef, token: &Token) -> Option<&'p Expr> {
-    visit_expr(&patch_def.base, token)
-        .or_else(|| visit_block(&patch_def.methods, token))
+    visit_expr(&patch_def.base, token).or_else(|| visit_block(&patch_def.methods, token))
 }
 
 fn visit_array<'a>(arr: &'a Array, token: &Token) -> Option<&'a Expr> {
