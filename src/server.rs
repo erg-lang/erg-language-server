@@ -491,43 +491,38 @@ impl<Checker: BuildRunnable> Server<Checker> {
         } else {
             None
         };
-        match opt_token
-            .as_ref()
-            .map(|tok| self.get_definition(tok))
-            .transpose()?
-        {
-            Some(Some((name, vi))) => {
-                if let Some(line) = name.ln_begin() {
-                    let path = uri.to_file_path().unwrap();
-                    let code_block = BufReader::new(File::open(path)?)
-                        .lines()
-                        .nth(line - 1)
-                        .unwrap_or_else(|| Ok(String::new()))?;
-                    let definition = MarkedString::from_language_code(lang.into(), code_block);
-                    contents.push(definition);
+        if let Some(token) = opt_token {
+            match self.get_definition(&token)? {
+                Some((name, vi)) => {
+                    if let Some(line) = name.ln_begin() {
+                        let path = uri.to_file_path().unwrap();
+                        let code_block = BufReader::new(File::open(path)?)
+                            .lines()
+                            .nth(line - 1)
+                            .unwrap_or_else(|| Ok(String::new()))?;
+                        let definition = MarkedString::from_language_code(lang.into(), code_block);
+                        contents.push(definition);
+                    }
+                    let typ =
+                        MarkedString::from_language_code(lang.into(), format!("{name}: {}", vi.t));
+                    contents.push(typ);
                 }
-                let typ =
-                    MarkedString::from_language_code(lang.into(), format!("{name}: {}", vi.t));
-                contents.push(typ);
-            }
-            // not found or not symbol, etc.
-            Some(None) => {
-                let token = opt_token.unwrap();
-                if let Some(hir) = &self.hir {
-                    let visitor = HIRVisitor::new(hir, !self.cfg.python_compatible_mode);
-                    if let Some(t) = visitor.visit_hir_t(&token) {
-                        let typ = MarkedString::from_language_code(
-                            lang.into(),
-                            format!("{}: {t}", token.content),
-                        );
-                        contents.push(typ);
+                // not found or not symbol, etc.
+                None => {
+                    if let Some(hir) = &self.hir {
+                        let visitor = HIRVisitor::new(hir, !self.cfg.python_compatible_mode);
+                        if let Some(typ) = visitor.visit_hir_t(&token) {
+                            let typ = MarkedString::from_language_code(
+                                lang.into(),
+                                format!("{}: {typ}", token.content),
+                            );
+                            contents.push(typ);
+                        }
                     }
                 }
             }
-            // lex error, etc.
-            None => {
-                self.send_log("lex error")?;
-            }
+        } else {
+            self.send_log("lex error")?;
         }
         let result = json!({ "contents": HoverContents::Array(contents) });
         self.send(&json!({ "jsonrpc": "2.0", "id": msg["id"].as_i64().unwrap(), "result": result }))
