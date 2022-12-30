@@ -471,7 +471,7 @@ impl<Checker: BuildRunnable> Server<Checker> {
 
     fn show_hover(&mut self, msg: &Value) -> ELSResult<()> {
         self.send_log(format!("hover requested : {msg}"))?;
-        let lang = if self.cfg.python_compatible_mode {
+        let lang = if cfg!(feature = "py_compatible") {
             "python"
         } else {
             "erg"
@@ -510,7 +510,7 @@ impl<Checker: BuildRunnable> Server<Checker> {
                 // not found or not symbol, etc.
                 None => {
                     if let Some(hir) = &self.hir {
-                        let visitor = HIRVisitor::new(hir, !self.cfg.python_compatible_mode);
+                        let visitor = HIRVisitor::new(hir, !cfg!(feature = "py_compatible"));
                         if let Some(typ) = visitor.visit_hir_t(&token) {
                             let typ = MarkedString::from_language_code(
                                 lang.into(),
@@ -622,7 +622,7 @@ impl<Checker: BuildRunnable> Server<Checker> {
                     .and_then(|ctx| ctx.get_receiver_ctx(var_name))
                     .or_else(|| {
                         let opt_t = self.hir.as_ref().and_then(|hir| {
-                            let visitor = HIRVisitor::new(hir, !self.cfg.python_compatible_mode);
+                            let visitor = HIRVisitor::new(hir, !cfg!(feature = "py_compatible"));
                             visitor.visit_hir_t(&token)
                         });
                         opt_t.and_then(|t| {
@@ -635,7 +635,7 @@ impl<Checker: BuildRunnable> Server<Checker> {
             } else {
                 self.send_log(format!("non-name token: {token}"))?;
                 if let Some(typ) = self.hir.as_ref().and_then(|hir| {
-                    let visitor = HIRVisitor::new(hir, !self.cfg.python_compatible_mode);
+                    let visitor = HIRVisitor::new(hir, !cfg!(feature = "py_compatible"));
                     visitor.visit_hir_t(&token)
                 }) {
                     let t_name = typ.qual_name();

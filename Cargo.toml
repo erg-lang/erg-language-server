@@ -11,6 +11,8 @@ homepage = "https://erg-lang.org/"
 keywords = ["erg", "language-server"]
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+[features]
+py_compatible = ["erg_compiler/py_compatible"]
 
 [dependencies]
 # erg_common = "0.6.1-nightly.1"
