@@ -1,5 +1,7 @@
 # els (erg-language-server)
 
+> __Warning__: This project has been integrated into [erg](https://github.com/erg-lang/erg/). Now it is be developed and maintained [here](https://github.com/erg-lang/erg/tree/main/compiler/els).
+
 ELS is a language server for the [Erg](https://github.com/erg-lang/erg) programming language.
 
 ## Features currently implemented
